@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*
+# 絕對不要提交登入資料
+*.sessionKey
+config.json
+
+# 本機除錯輸出
+debug/
