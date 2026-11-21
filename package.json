@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "description": "Unofficial floating desktop widget for Claude subscription usage limits (5-hour & weekly). 桌面浮動顯示 Claude 使用量。",
   "main": "src/main.js",
-  "author": "ckolpeter",
+  "author": {
+    "name": "ckolpeter",
+    "email": "ckolpeter@users.noreply.github.com"
+  },
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -97,7 +100,7 @@
       ],
       "icon": "assets/icon.png",
       "category": "Utility",
-      "maintainer": "ckolpeter"
+      "maintainer": "ckolpeter <ckolpeter@users.noreply.github.com>"
     },
     "publish": [
       {
