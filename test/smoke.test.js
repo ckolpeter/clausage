@@ -20,9 +20,21 @@ test('startup → fetch → widget state, tray, settings', () => {
   assert.deepEqual(r.state.windows.map(w => [w.key, w.pct]), [['five_hour', 45], ['seven_day', 16]]);
   assert.equal(r.state.breakdown.rows.length, 4);
   assert.match(r.tooltip, /45%/);
-  assert.equal(r.trayImage, true);
+  // Windows/Linux draw the number into the tray icon; macOS shows it as menu bar text
+  if (r.platform === 'darwin') assert.match(r.trayTitle, /45%/);
+  else assert.equal(r.trayImage, true);
   assert.equal(r.languages, 10);
   assert.deepEqual(r.thresholds, [50, 95]);
+});
+
+test('tray number on each platform (simulated)', () => {
+  const mac = run({ SIM_PLATFORM: 'darwin' });
+  assert.equal(mac.platform, 'darwin');
+  assert.equal(mac.trayTitle.trim(), '45%');
+  assert.equal(mac.trayImage, false);
+  const win = run({ SIM_PLATFORM: 'win32' });
+  assert.equal(win.trayImage, true);
+  assert.equal(win.trayTitle, '');
 });
 
 test('offline → offline message with a scheduled retry', () => {

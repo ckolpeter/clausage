@@ -2,6 +2,8 @@
 // Runs src/main.js with test/fake-electron.js in place of Electron, then prints the
 // last state pushed to the widget plus a few IPC results as JSON on stdout.
 process.env.CLAUSAGE_TEST = '1'; // don't overwrite the developer's debug/ folder
+// Pretend to be another OS (e.g. SIM_PLATFORM=darwin) to test platform-specific paths anywhere
+if (process.env.SIM_PLATFORM) Object.defineProperty(process, 'platform', { value: process.env.SIM_PLATFORM });
 const Module = require('module');
 const path = require('path');
 const fake = path.join(__dirname, 'fake-electron.js');
@@ -17,7 +19,7 @@ setTimeout(async () => {
   await ipc['settings:set']({}, { notifyThresholds: [95, 50, 200, 'x'] });
   const after = await ipc['settings:get']();
   process.stdout.write('\n@@RESULT@@' + JSON.stringify({
-    state, tooltip: global.__tooltip, trayImage: !!global.__trayImage,
+    state, tooltip: global.__tooltip, trayImage: !!global.__trayImage, trayTitle: global.__trayTitle || '', platform: process.platform,
     languages: settings.languages.length, thresholds: after.config.notifyThresholds,
   }));
   process.exit(0);

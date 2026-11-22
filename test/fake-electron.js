@@ -48,7 +48,7 @@ const session = { fromPartition: (p) => ({
   setUserAgent() {}, clearStorageData: async () => {},
 }) };
 class Notification { static isSupported() { return true; } constructor(o) { this.o = o; } show() { (global.__notes ||= []).push(this.o); } }
-class Tray { constructor() {} on() {} setToolTip(t) { global.__tooltip = t; } setContextMenu() {} setImage() { global.__trayImage = true; } setTitle() {} }
+class Tray { constructor() {} on() {} setToolTip(t) { global.__tooltip = t; } setContextMenu() {} setImage() { global.__trayImage = true; } setTitle(t) { global.__trayTitle = t; } }
 const display = { workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
 module.exports = {
   app, BrowserWindow, Tray, Notification, session,
