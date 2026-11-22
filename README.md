@@ -39,6 +39,12 @@ Download the latest build from [Releases](../../releases):
 | macOS | `Clausage-x.y.z-mac-universal.dmg` |
 | Linux | `.AppImage` or `.deb` |
 
+macOS with [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask ckolpeter/tap/clausage
+```
+
 Builds are not code-signed yet:
 - **Windows:** in SmartScreen, click *More info → Run anyway*
 - **macOS:** right-click the app → *Open* (first launch only)

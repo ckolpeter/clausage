@@ -39,6 +39,12 @@
 | macOS | `Clausage-x.y.z-mac-universal.dmg` |
 | Linux | `.AppImage` 或 `.deb` |
 
+macOS 也可以用 [Homebrew](https://brew.sh) 安裝：
+
+```bash
+brew install --cask ckolpeter/tap/clausage
+```
+
 目前尚未簽章：
 - **Windows**：SmartScreen 點「其他資訊 → 仍要執行」
 - **macOS**：第一次開啟時對 App 按右鍵 →「打開」
