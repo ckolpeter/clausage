@@ -12,3 +12,6 @@ config.json
 
 # 本機除錯輸出
 debug/
+
+# Claude Code 個人筆記（不提交）
+CLAUDE.local.md
