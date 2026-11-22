@@ -48,7 +48,7 @@ npm run dist:win:local # Windows build reusing node_modules/electron/dist (no El
 npm run dist:win | dist:mac | dist:linux
 ```
 
-Release: `npm version x.y.z && git push --follow-tags` → GitHub Actions builds all 3 platforms and creates a **draft** Release → publish it manually.
+Release: `npm version x.y.z && git push --follow-tags` → GitHub Actions builds all 3 platforms and creates a **draft** Release → publish it manually → `packaging.yml` then updates the Homebrew tap and opens a winget PR (needs secret `PACKAGING_TOKEN`; see `packaging/README.md`).
 
 ## Known pitfalls
 

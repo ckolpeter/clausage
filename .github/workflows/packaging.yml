@@ -1,0 +1,87 @@
+# 按下 Release 的 Publish 之後：更新 Homebrew tap，並送 winget 更新 PR
+# After a Release is published: update the Homebrew tap and open a winget update PR.
+#
+# 需要 repo secret PACKAGING_TOKEN：classic token，只勾 public_repo
+# (Komac 需要 classic token 才能對 microsoft/winget-pkgs 開 PR)
+# 沒設定時兩個 job 都會跳過並顯示警告，不會失敗。
+name: Packaging
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish, e.g. v0.2.1
+        required: true
+
+permissions:
+  contents: read
+
+concurrency: packaging-${{ github.event.release.tag_name || inputs.tag }}
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  KOMAC_VERSION: 2.17.2
+  KOMAC_SHA256: b03b020eec98acfb0b53e284a6e21815b884be33de6785b97e7a120f0e748966
+
+jobs:
+  homebrew:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Update ckolpeter/homebrew-tap
+        env:
+          TOKEN: ${{ secrets.PACKAGING_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::PACKAGING_TOKEN is not set; skipping Homebrew."
+            exit 0
+          fi
+          bash scripts/update-homebrew-tap.sh
+
+  winget:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check token
+        id: token
+        env:
+          TOKEN: ${{ secrets.PACKAGING_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::PACKAGING_TOKEN is not set; skipping winget."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Komac (official winget-pkgs submission tool), pinned version + checksum
+      - name: Install Komac
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          curl -fsSL -o komac.tar.gz "https://github.com/russellbanks/Komac/releases/download/v${KOMAC_VERSION}/komac-${KOMAC_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${KOMAC_SHA256}  komac.tar.gz" | sha256sum -c -
+          tar -xzf komac.tar.gz komac
+          sudo install komac /usr/local/bin/komac
+
+      - name: Submit winget update PR
+        if: steps.token.outputs.ok == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PACKAGING_TOKEN }}
+        run: |
+          VERSION="${TAG#v}"
+          # The first version (0.2.0) must already be merged into microsoft/winget-pkgs
+          if ! komac list-versions ckolpeter.Clausage > /dev/null 2>&1; then
+            echo "::warning::ckolpeter.Clausage is not in winget-pkgs yet (first PR not merged); skipping."
+            exit 0
+          fi
+          komac sync-fork
+          komac update ckolpeter.Clausage \
+            --version "$VERSION" \
+            --urls "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Clausage-${VERSION}-win-x64.exe" \
+            --release-notes-url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" \
+            --submit
