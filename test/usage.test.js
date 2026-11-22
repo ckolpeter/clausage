@@ -42,6 +42,28 @@ test('per-model weekly limits from the limits array, deduped with legacy fields'
   assert.deepEqual(st.windows.map(w => w.kind), ['session', 'weekly', 'model', 'model']);
 });
 
+test('scope objects and internal codenames (as seen in the Nov 2026 response)', () => {
+  const { scopeName, formatIssues } = require('../src/usage');
+  const resets = '2026-11-23T11:00:00+00:00';
+  const raw = {
+    ...fixture,
+    limits: [...fixture.limits,
+      { kind: 'weekly_scoped', group: 'weekly', percent: 4, resets_at: resets, scope: { model: { id: null, display_name: 'Fable' }, surface: null } }],
+    // A dollar allowance under an internal codename, not in the limits array: claude.ai doesn't show it
+    harbor_lantern: { utilization: 62.6, resets_at: '2026-11-22T15:31:52.296064+00:00', limit_dollars: 100, used_dollars: 62.6 },
+  };
+  const st = normalize({ raw, plan: 'Pro', orgName: '' });
+  assert.deepEqual(st.windows.map(w => [w.kind, w.labelVars?.name ?? null, w.pct]),
+    [['session', null, 45], ['weekly', null, 16], ['model', 'Fable', 4]]);
+  assert.equal(st.formatIssues, undefined);
+
+  assert.equal(scopeName('opus'), 'opus');
+  assert.equal(scopeName({ model: 'claude-opus-4' }), 'claude-opus-4');
+  assert.equal(scopeName({ surface: { display_name: 'Claude Code' }, model: null }), 'Claude Code');
+  assert.equal(scopeName({ weird: 1 }), null);
+  assert.deepEqual(formatIssues({ limits: [{ kind: 'weekly_scoped', percent: 1, scope: { weird: 1 } }] }, []), ['scope-unnamed']);
+});
+
 test('legacy-only response (no limits array)', () => {
   const st = normalize({
     raw: { five_hour: { utilization: '30', resets_at: null }, seven_day: { utilization: null }, seven_day_sonnet: { utilization: 5 }, limits: [] },

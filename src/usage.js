@@ -51,6 +51,19 @@ function sameReset(a, b) {
 }
 
 /**
+ * Readable name of a limit's scope. Seen so far: a string ('opus'), or an object such as
+ * { model: { id: null, display_name: 'Fable' }, surface: null }. Returns null if nothing readable.
+ */
+function scopeName(scope) {
+  if (scope == null) return null;
+  if (typeof scope !== 'object') return String(scope);
+  const named = (o) => (o && typeof o === 'object'
+    ? o.display_name || o.name || o.id || o.key || null
+    : (typeof o === 'string' && o) || null);
+  return named(scope) || named(scope.model) || named(scope.surface) || named(scope.product) || null;
+}
+
+/**
  * A usage window:
  *   key        stable id ('five_hour' and 'seven_day' are the two primary windows)
  *   labelKey   i18n key, labelVars for {placeholders}
@@ -62,7 +75,8 @@ function windowsFromLimits(limits) {
     if (!l || typeof l !== 'object') continue;
     const kind = String(l.kind || '');
     const group = String(l.group || '');
-    const scope = l.scope == null ? null : (typeof l.scope === 'object' ? (l.scope.name || l.scope.key || l.scope.model || JSON.stringify(l.scope)) : String(l.scope));
+    const scope = scopeName(l.scope);
+    const modelScoped = !!(l.scope && typeof l.scope === 'object' && l.scope.model);
     const base = { pct: pctOf(l.percent ?? l.utilization), resetsAt: stableReset(l.resets_at), severity: l.severity || null };
     if (kind === 'session' || group === 'session') {
       out.push({ ...base, key: 'five_hour', labelKey: 'label.five_hour', durationMs: 5 * HOUR, primary: true, kind: 'session' });
@@ -70,7 +84,7 @@ function windowsFromLimits(limits) {
       out.push({ ...base, key: 'seven_day', labelKey: 'label.seven_day', durationMs: 7 * DAY, primary: true, kind: 'weekly' });
     } else {
       const name = scope || kind.replace(/^weekly_?/, '') || kind;
-      const isModel = MODEL_RE.test(name) || /model/i.test(kind);
+      const isModel = modelScoped || MODEL_RE.test(name) || /model/i.test(kind);
       const weekly = group === 'weekly' || /^weekly/.test(kind);
       out.push({
         ...base,
@@ -86,10 +100,17 @@ function windowsFromLimits(limits) {
   return out;
 }
 
-function windowsFromLegacy(raw) {
+/**
+ * Windows from the older per-key fields (five_hour, seven_day, seven_day_opus…).
+ * knownOnly: skip unknown keys. The response also carries internal codenames (e.g. harbor_lantern,
+ * a dollar allowance) that claude.ai itself doesn't show; when the limits array is present, it is the
+ * list claude.ai displays, so only the keys we understand are used to fill its gaps.
+ */
+function windowsFromLegacy(raw, knownOnly = false) {
   const out = [];
   for (const [key, v] of Object.entries(raw || {})) {
     if (key === 'extra_usage' || !v || typeof v !== 'object' || Array.isArray(v) || !('utilization' in v)) continue;
+    if (knownOnly && !KNOWN_LEGACY.has(key)) continue;
     const known = `label.${key}`;
     const hasLabel = KNOWN_LEGACY.has(key);
     out.push({
@@ -121,6 +142,7 @@ function formatIssues(raw, windows) {
   for (const l of Array.isArray(raw?.limits) ? raw.limits : []) {
     if (!l || typeof l !== 'object') { issues.add('limit-not-object'); continue; }
     if (!l.kind && !l.group) issues.add('limit-no-kind');
+    if (l.scope != null && !scopeName(l.scope)) issues.add('scope-unnamed');
     if (!('percent' in l) && !('utilization' in l)) issues.add('limit-no-percent');
     else if (badNumber(l.percent ?? l.utilization)) issues.add('bad-percent');
     if (badDate(l.resets_at)) issues.add('bad-reset');
@@ -158,7 +180,7 @@ function normalize({ raw, plan, orgName }, source = 'web', now = Date.now()) {
   // Prefer the newer `limits` array; fill in anything it lacks from the legacy fields
   const fromLimits = Array.isArray(raw?.limits) ? windowsFromLimits(raw.limits) : [];
   const windows = [...fromLimits];
-  for (const w of windowsFromLegacy(raw)) {
+  for (const w of windowsFromLegacy(raw, fromLimits.length > 0)) {
     const dupe = windows.some(x => x.key === w.key
       || (w.kind === 'model' && x.kind === 'model'
         && (w.key.match(MODEL_RE) || [])[0]?.toLowerCase() === (x.key.match(MODEL_RE) || [])[0]?.toLowerCase()));
@@ -216,5 +238,5 @@ function addEta(state, history = null, now = Date.now()) {
 
 module.exports = {
   planOf, hasUsage, normalize, addEta, spendOf, windowsFromLimits, windowsFromLegacy, pctOf, formatIssues,
-  stableReset, sameReset,
+  stableReset, sameReset, scopeName,
 };
