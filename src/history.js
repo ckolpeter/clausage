@@ -8,6 +8,7 @@
  */
 const fs = require('fs');
 const { writeFileAtomic, Debounced } = require('./store');
+const { stableReset, sameReset } = require('./usage');
 
 const KEEP_MS = 8 * 24 * 3600e3;
 const MIN_GAP_MS = 50e3;          // ignore samples closer than this
@@ -20,7 +21,11 @@ class History {
     this.samples = [];
     try {
       const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (Array.isArray(data)) this.samples = data.filter(s => s && typeof s.t === 'number');
+      if (Array.isArray(data)) {
+        // Older versions stored the jittery resets_at as is; round it like new samples
+        this.samples = data.filter(s => s && typeof s.t === 'number')
+          .map(s => ({ ...s, fr: stableReset(s.fr), wr: stableReset(s.wr) }));
+      }
     } catch { /* first run */ }
     this.prune();
     this.saver = new Debounced(() => {
@@ -63,7 +68,7 @@ class History {
    */
   recentRate(field, resetsAt, now = Date.now()) {
     const rk = field === 'f' ? 'fr' : 'wr';
-    const pts = this.samples.filter(s => s[rk] === resetsAt && s[field] != null && s.t >= now - RATE_LOOKBACK_MS);
+    const pts = this.samples.filter(s => sameReset(s[rk], resetsAt) && s[field] != null && s.t >= now - RATE_LOOKBACK_MS);
     if (pts.length < 2) return null;
     const a = pts[0], b = pts[pts.length - 1];
     const span = b.t - a.t;

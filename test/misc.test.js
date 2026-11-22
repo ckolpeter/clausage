@@ -50,6 +50,23 @@ test('withTimeout: passes results through, gives up on hung requests', async () 
   assert.equal(sig.aborted, true); // the underlying request is cancelled too
 });
 
+test('history: old unrounded reset times are merged into one window for the recent pace', () => {
+  const { History } = require('../src/history');
+  const file = path.join(os.tmpdir(), `clausage-hist-jitter-${process.pid}.json`);
+  const now = Date.now();
+  // As 0.2.x stored them: every sample has a slightly different resets_at
+  fs.writeFileSync(file, JSON.stringify([
+    { t: now - 30 * 60e3, f: 10, fr: '2026-11-22T14:59:59.547793+00:00', w: 5, wr: null },
+    { t: now - 15 * 60e3, f: 15, fr: '2026-11-22T15:00:00.199518+00:00', w: 5, wr: null },
+    { t: now, f: 20, fr: '2026-11-22T15:00:00.431568+00:00', w: 5, wr: null },
+  ]));
+  const h = new History(file);
+  assert.deepEqual([...new Set(h.samples.map(s => s.fr))], ['2026-11-22T15:00:00.000Z']);
+  const rate = h.recentRate('f', '2026-11-22T15:00:00.000Z', now);
+  assert.ok(Math.abs(rate - 10 / (30 * 60e3)) < 1e-12); // 10 points in 30 minutes
+  fs.unlinkSync(file);
+});
+
 test('history: flush() writes a pending sample immediately (quit)', () => {
   const { History } = require('../src/history');
   const file = path.join(os.tmpdir(), `clausage-hist-flush-${process.pid}.json`);

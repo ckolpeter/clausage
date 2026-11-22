@@ -154,7 +154,7 @@ function applyFullscreenMode() {
   applyTopmost();
 }
 let lastState = { status: 'loading' };
-const notified = new Set();
+const notified = new Map(); // "account|window|threshold" → resetsAt of the window it was announced for
 
 function ses(part = PARTITION) { return session.fromPartition(part); }
 
@@ -533,9 +533,9 @@ function maybeNotify(state, who = '') {
     const crossed = ths.filter(th => w.pct >= th);
     const top = crossed[crossed.length - 1];
     if (top == null) continue;
-    const id = (th) => `${who}|${w.key}|${w.resetsAt}|${th}`;
-    if (notified.has(id(top))) continue;
-    crossed.forEach(th => notified.add(id(th)));
+    const id = (th) => `${who}|${w.key}|${th}`;
+    if (notified.has(id(top)) && usage.sameReset(notified.get(id(top)), w.resetsAt)) continue;
+    crossed.forEach(th => notified.set(id(th), w.resetsAt));
     notify({
       title: (who ? `${who} · ` : '') + t('notify.title', { label: labelOf(w), pct: Math.round(w.pct) }),
       body: w.resetsAt ? t('notify.body', { time: new Date(w.resetsAt).toLocaleString(lang) }) : '',
@@ -554,7 +554,7 @@ function checkResets(prev, cur) {
     const c = cur.windows.find(w => w.key === key);
     if (!p || !c || p.pct < 20) continue; // nothing worth announcing
     const prevEnded = p.resetsAt && new Date(p.resetsAt).getTime() <= now;
-    const newWindow = p.resetsAt && c.resetsAt && c.resetsAt !== p.resetsAt;
+    const newWindow = p.resetsAt && c.resetsAt && !usage.sameReset(c.resetsAt, p.resetsAt);
     if ((prevEnded || newWindow) && c.pct < p.pct - 5) {
       notify({
         title: t('notify.resetTitle', { label: labelOf(c) }),

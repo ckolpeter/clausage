@@ -106,6 +106,18 @@ test('run-out prediction: average pace, recent pace, exhausted, idle', () => {
   assert.equal(st.windows[0].eta.at, null);
 });
 
+test('resets_at jitter: rounded to the minute, compared with tolerance', () => {
+  const { stableReset, sameReset } = require('../src/usage');
+  assert.equal(stableReset('2026-11-22T14:59:59.547793+00:00'), '2026-11-22T15:00:00.000Z');
+  assert.equal(stableReset('2026-11-22T15:00:00.431568+00:00'), '2026-11-22T15:00:00.000Z');
+  assert.equal(stableReset(null), null);
+  assert.equal(stableReset('soon'), 'soon'); // unparseable passes through (the format check flags it)
+  assert.equal(sameReset('2026-11-22T15:00:00.000Z', '2026-11-22T15:01:00.000Z'), true);
+  assert.equal(sameReset('2026-11-22T15:00:00.000Z', '2026-11-22T20:00:00.000Z'), false);
+  assert.equal(sameReset(null, null), true);
+  assert.equal(sameReset(null, '2026-11-22T15:00:00.000Z'), false);
+});
+
 test('format check: real response is clean, format changes are flagged', () => {
   const { formatIssues, normalize } = require('../src/usage');
   const check = (raw) => formatIssues(raw, normalize({ raw, plan: 'Pro', orgName: '' }).windows);

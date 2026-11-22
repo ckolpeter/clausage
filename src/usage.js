@@ -31,6 +31,26 @@ const pretty = (s) => String(s).replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.t
 const MODEL_RE = /(opus|sonnet|haiku|fable|mythos)/i;
 
 /**
+ * claude.ai computes resets_at on every request, so the same window comes back as
+ * 14:59:59.547, 15:00:00.199, 15:00:00.431… Round to the minute so a window keeps one id
+ * (history, notifications and the reset check all compare it). Unparseable values pass through.
+ */
+function stableReset(v) {
+  if (v == null || v === '') return null;
+  const ms = Date.parse(v);
+  return Number.isFinite(ms) ? new Date(Math.round(ms / 60e3) * 60e3).toISOString() : v;
+}
+
+/** Same usage window? Reset times within a few minutes of each other (windows are hours long) */
+const SAME_RESET_MS = 5 * 60e3;
+function sameReset(a, b) {
+  if (a == null || b == null) return a == b; // eslint-disable-line eqeqeq
+  if (a === b) return true;
+  const d = Math.abs(Date.parse(a) - Date.parse(b));
+  return Number.isFinite(d) && d < SAME_RESET_MS;
+}
+
+/**
  * A usage window:
  *   key        stable id ('five_hour' and 'seven_day' are the two primary windows)
  *   labelKey   i18n key, labelVars for {placeholders}
@@ -43,7 +63,7 @@ function windowsFromLimits(limits) {
     const kind = String(l.kind || '');
     const group = String(l.group || '');
     const scope = l.scope == null ? null : (typeof l.scope === 'object' ? (l.scope.name || l.scope.key || l.scope.model || JSON.stringify(l.scope)) : String(l.scope));
-    const base = { pct: pctOf(l.percent ?? l.utilization), resetsAt: l.resets_at || null, severity: l.severity || null };
+    const base = { pct: pctOf(l.percent ?? l.utilization), resetsAt: stableReset(l.resets_at), severity: l.severity || null };
     if (kind === 'session' || group === 'session') {
       out.push({ ...base, key: 'five_hour', labelKey: 'label.five_hour', durationMs: 5 * HOUR, primary: true, kind: 'session' });
     } else if (kind === 'weekly_all') {
@@ -77,7 +97,7 @@ function windowsFromLegacy(raw) {
       labelKey: hasLabel ? known : 'label.weeklyScoped',
       labelVars: hasLabel ? undefined : { name: pretty(key.replace(/^seven_day_?/, '')) },
       pct: pctOf(v.utilization),
-      resetsAt: v.resets_at || null,
+      resetsAt: stableReset(v.resets_at),
       durationMs: key === 'five_hour' ? 5 * HOUR : key.startsWith('seven_day') ? 7 * DAY : null,
       primary: key === 'five_hour' || key === 'seven_day',
       kind: key === 'five_hour' ? 'session' : key === 'seven_day' ? 'weekly' : MODEL_RE.test(key) ? 'model' : 'other',
@@ -196,4 +216,5 @@ function addEta(state, history = null, now = Date.now()) {
 
 module.exports = {
   planOf, hasUsage, normalize, addEta, spendOf, windowsFromLimits, windowsFromLegacy, pctOf, formatIssues,
+  stableReset, sameReset,
 };

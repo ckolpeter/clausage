@@ -59,6 +59,13 @@ test('hung request → gives up after the timeout, network error, retry', () => 
   assert.equal(r.state.refreshing, undefined);
 });
 
+test('threshold notification fires once per window even though resets_at jitters', () => {
+  const r = run({ JITTER: '1', REFRESHES: '4', PRECONFIG: JSON.stringify({ notifyThresholds: [40] }) });
+  assert.equal(r.state.status, 'ok');
+  assert.equal(r.notes.filter(t => /45%/.test(t)).length, 1);
+  assert.match(r.state.windows[0].resetsAt, /:00.000Z$/); // rounded to the minute
+});
+
 test('extra accounts are fetched alongside the main one', () => {
   const r = run({ PRECONFIG: JSON.stringify({ accounts: [{ partition: 'persist:claude-acct-x', email: 'work@example.com' }] }) });
   assert.deepEqual(r.state.others.map(o => [o.email, o.status]), [['work@example.com', 'ok']]);

@@ -117,7 +117,9 @@ async function render() {
   const peak5 = five.length ? Math.max(...five.map(p => p.v)) : null;
   const cur7 = week.length ? week[week.length - 1].v : null;
   // How many times the 5-hour limit was nearly maxed (≥ 90%) in the last 7 days (count distinct windows)
-  const near = new Set(data.fiveWeek.filter(p => p.v >= 90).map(p => p.r)).size;
+  // (reset times a few minutes apart are the same window: older history stored them unrounded)
+  const resets = [...new Set(data.fiveWeek.filter(p => p.v >= 90).map(p => Date.parse(p.r)))].filter(Number.isFinite).sort((a, b) => a - b);
+  const near = resets.filter((r, i) => i === 0 || r - resets[i - 1] >= 5 * 60e3).length;
   stats.append(
     stat(peak5 == null ? '–' : Math.round(peak5) + '%', t('h.peak5')),
     stat(cur7 == null ? '–' : Math.round(cur7) + '%', t('h.cur7')),
