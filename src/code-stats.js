@@ -17,11 +17,9 @@ const DAY = 24 * 3600e3;
 const WINDOW_MS = 7 * DAY;
 
 function configDirs() {
-  const dirs = [];
-  if (process.env.CLAUDE_CONFIG_DIR) {
-    for (const d of process.env.CLAUDE_CONFIG_DIR.split(',')) if (d.trim()) dirs.push(d.trim());
-  }
-  dirs.push(path.join(os.homedir(), '.config', 'claude'), path.join(os.homedir(), '.claude'));
+  // Like Claude Code itself: CLAUDE_CONFIG_DIR (comma-separated) replaces the default locations.
+  const dirs = (process.env.CLAUDE_CONFIG_DIR || '').split(',').map(d => d.trim()).filter(Boolean);
+  if (!dirs.length) dirs.push(path.join(os.homedir(), '.config', 'claude'), path.join(os.homedir(), '.claude'));
   return [...new Set(dirs)].map(d => path.join(d, 'projects')).filter(d => fs.existsSync(d));
 }
 
