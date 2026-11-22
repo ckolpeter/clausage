@@ -21,6 +21,7 @@ const { History } = require('./history');
 const { Updater } = require('./updater');
 const { CodeStats } = require('./code-stats');
 const { FullscreenWatcher } = require('./fullscreen');
+const { writeFileAtomic, Debounced } = require('./store');
 const usage = require('./usage');
 const { planOf, hasUsage } = usage;
 
@@ -75,13 +76,10 @@ function loadConfig() {
   try { config = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG_PATH(), 'utf8')) }; }
   catch { config = { ...DEFAULTS }; }
 }
-let saveTimer = null;
-function saveConfig() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { fs.writeFileSync(CONFIG_PATH(), JSON.stringify(config, null, 2)); } catch (e) { console.error(e); }
-  }, 300);
-}
+const configSaver = new Debounced(() => {
+  try { writeFileAtomic(CONFIG_PATH(), JSON.stringify(config, null, 2)); } catch (e) { console.error(e); }
+}, 300);
+function saveConfig() { configSaver.schedule(); }
 
 // ---------------------------------------------------------------- i18n
 // Every *.json in src/locales is a language. To add one, copy en.json and translate it.
@@ -1006,7 +1004,10 @@ ipcMain.on('settings:logout', () => logout());
 // ---------------------------------------------------------------- startup
 app.on('second-instance', () => { if (widget) widget.showInactive(); else createWidget(); });
 app.on('window-all-closed', () => { /* stay alive in the tray */ });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); fullscreen.stop(); });
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll(); fullscreen.stop();
+  configSaver.flush(); history?.flush(); // don't lose a change made just before quitting
+});
 
 app.whenReady().then(async () => {
   if (IS_MAC && app.dock) app.dock.hide();

@@ -7,6 +7,7 @@
  * Kept for 8 days, saved to <userData>/history.json. Never leaves the computer.
  */
 const fs = require('fs');
+const { writeFileAtomic, Debounced } = require('./store');
 
 const KEEP_MS = 8 * 24 * 3600e3;
 const MIN_GAP_MS = 50e3;          // ignore samples closer than this
@@ -22,7 +23,9 @@ class History {
       if (Array.isArray(data)) this.samples = data.filter(s => s && typeof s.t === 'number');
     } catch { /* first run */ }
     this.prune();
-    this.saveTimer = null;
+    this.saver = new Debounced(() => {
+      try { writeFileAtomic(this.file, JSON.stringify(this.samples)); } catch (e) { console.error('[history]', e); }
+    }, 1000);
   }
 
   /** Record a normalized 'ok' state */
@@ -47,12 +50,10 @@ class History {
     if (this.samples.length && this.samples[0].t < cut) this.samples = this.samples.filter(s => s.t >= cut);
   }
 
-  save() {
-    clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      try { fs.writeFileSync(this.file, JSON.stringify(this.samples)); } catch (e) { console.error('[history]', e); }
-    }, 1000);
-  }
+  save() { this.saver.schedule(); }
+
+  /** Write a pending save now (called on quit) */
+  flush() { this.saver.flush(); }
 
   clear() { this.samples = []; this.save(); }
 

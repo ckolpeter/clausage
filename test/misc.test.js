@@ -22,6 +22,37 @@ test('history: samples, CSV export, pruning', () => {
   assert.equal(csv.length, 3);
 });
 
+test('store: atomic write replaces the file and leaves no temp file; debounce + flush', () => {
+  const { writeFileAtomic, Debounced } = require('../src/store');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clausage-store-'));
+  const file = path.join(dir, 'config.json');
+  writeFileAtomic(file, '{"a":1}');
+  writeFileAtomic(file, '{"a":2}');
+  assert.equal(fs.readFileSync(file, 'utf8'), '{"a":2}');
+  assert.deepEqual(fs.readdirSync(dir), ['config.json']);
+
+  let runs = 0;
+  const d = new Debounced(() => runs++, 60e3);
+  d.schedule(); d.schedule(); d.schedule();
+  assert.equal(runs, 0);
+  d.flush();                 // pending → runs once, now
+  d.flush();                 // nothing pending → no-op
+  assert.equal(runs, 1);
+});
+
+test('history: flush() writes a pending sample immediately (quit)', () => {
+  const { History } = require('../src/history');
+  const file = path.join(os.tmpdir(), `clausage-hist-flush-${process.pid}.json`);
+  try { fs.unlinkSync(file); } catch { /* none */ }
+  const h = new History(file);
+  h.add({ windows: [{ key: 'five_hour', pct: 42, resetsAt: 'R' }] });
+  assert.equal(fs.existsSync(file), false); // still debounced
+  h.flush();
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8'))[0].f, 42);
+  assert.equal(new History(file).samples.length, 1);
+  fs.unlinkSync(file);
+});
+
 test('version comparison', () => {
   const { newer } = require('../src/version');
   assert.equal(newer('v0.2.0', '0.1.0'), true);
