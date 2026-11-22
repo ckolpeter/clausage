@@ -35,7 +35,7 @@ Download the latest build from [Releases](../../releases):
 
 | OS | File |
 |---|---|
-| Windows | `Clausage-x.y.z-win-x64.exe` (installer) or the portable `.exe` |
+| Windows | `Clausage-x.y.z-win-x64.exe` (installer) or `Clausage-x.y.z-win-x64-portable.exe` (portable) |
 | macOS | `Clausage-x.y.z-mac-universal.dmg` |
 | Linux | `.AppImage` or `.deb` |
 

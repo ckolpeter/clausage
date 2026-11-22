@@ -35,7 +35,7 @@
 
 | 系統 | 檔案 |
 |---|---|
-| Windows | `Clausage-x.y.z-win-x64.exe`（安裝版）或免安裝版 `.exe` |
+| Windows | `Clausage-x.y.z-win-x64.exe`（安裝版）或 `Clausage-x.y.z-win-x64-portable.exe`（免安裝版） |
 | macOS | `Clausage-x.y.z-mac-universal.dmg` |
 | Linux | `.AppImage` 或 `.deb` |
 
