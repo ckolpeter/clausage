@@ -78,6 +78,7 @@
   "w.offline": "⚠ Offline",
   "w.retrying": "⚠ Neuer Versuch in {s} s",
   "w.report": "Problem melden",
+  "w.formatChanged": "claude.ai hat das Format der Nutzungsdaten geändert, einige Werte könnten falsch sein. Aktualisiere Clausage.",
   "s.thresholds": "Benachrichtigen bei (%)",
   "s.quiet": "Ruhezeiten",
   "s.hideOnFullscreen": "Ausblenden, wenn eine andere App im Vollbild ist (Spiele, Folien, Video)",

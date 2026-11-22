@@ -88,6 +88,32 @@ function windowsFromLegacy(raw) {
 
 const KIND_ORDER = { session: 0, weekly: 1, model: 2, other: 3 };
 
+/**
+ * Signs that the (undocumented) response format changed in a way that would show wrong numbers
+ * instead of failing loudly. null values are fine (an unused window); missing or unparseable ones are not.
+ * Returns a sorted list of issue codes, empty when everything looks as expected.
+ */
+function formatIssues(raw, windows) {
+  const issues = new Set();
+  const badNumber = (v) => v != null && !Number.isFinite(Number(v));
+  const badDate = (v) => v != null && !Number.isFinite(Date.parse(v));
+  if (raw && 'limits' in raw && raw.limits != null && !Array.isArray(raw.limits)) issues.add('limits-not-array');
+  for (const l of Array.isArray(raw?.limits) ? raw.limits : []) {
+    if (!l || typeof l !== 'object') { issues.add('limit-not-object'); continue; }
+    if (!l.kind && !l.group) issues.add('limit-no-kind');
+    if (!('percent' in l) && !('utilization' in l)) issues.add('limit-no-percent');
+    else if (badNumber(l.percent ?? l.utilization)) issues.add('bad-percent');
+    if (badDate(l.resets_at)) issues.add('bad-reset');
+  }
+  for (const [k, v] of Object.entries(raw || {})) {
+    if (k === 'extra_usage' || !v || typeof v !== 'object' || Array.isArray(v) || !('utilization' in v)) continue;
+    if (badNumber(v.utilization)) issues.add('bad-percent');
+    if (badDate(v.resets_at)) issues.add('bad-reset');
+  }
+  if (windows.length && !windows.some(w => w.primary)) issues.add('no-primary');
+  return [...issues].sort();
+}
+
 /** Extra usage (pay-as-you-go beyond the plan): prefer the newer `spend`, fall back to `extra_usage` */
 function spendOf(raw) {
   const money = (m) => (m && m.amount_minor != null ? m.amount_minor / 10 ** (m.exponent ?? 2) : null);
@@ -136,7 +162,10 @@ function normalize({ raw, plan, orgName }, source = 'web', now = Date.now()) {
     }
     : null;
 
-  return { status: 'ok', windows, spend, breakdown, plan, orgName, source, fetchedAt: now };
+  const state = { status: 'ok', windows, spend, breakdown, plan, orgName, source, fetchedAt: now };
+  const issues = formatIssues(raw, windows);
+  if (issues.length) state.formatIssues = issues;
+  return state;
 }
 
 // ---------------------------------------------------------------- run-out prediction
@@ -166,5 +195,5 @@ function addEta(state, history = null, now = Date.now()) {
 }
 
 module.exports = {
-  planOf, hasUsage, normalize, addEta, spendOf, windowsFromLimits, windowsFromLegacy, pctOf,
+  planOf, hasUsage, normalize, addEta, spendOf, windowsFromLimits, windowsFromLegacy, pctOf, formatIssues,
 };

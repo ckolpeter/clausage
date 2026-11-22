@@ -78,6 +78,7 @@
   "w.offline": "⚠ Sem conexão",
   "w.retrying": "⚠ Nova tentativa em {s} s",
   "w.report": "Relatar este problema",
+  "w.formatChanged": "O claude.ai mudou o formato dos dados de uso, então alguns números podem estar errados. Tente atualizar o Clausage.",
   "s.thresholds": "Avisar ao atingir (%)",
   "s.quiet": "Horário silencioso",
   "s.hideOnFullscreen": "Ocultar quando outro app estiver em tela cheia (jogos, apresentações, vídeo)",

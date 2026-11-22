@@ -56,3 +56,18 @@ test('extra accounts are fetched alongside the main one', () => {
   assert.deepEqual(r.state.others.map(o => [o.email, o.status]), [['work@example.com', 'ok']]);
   assert.equal(r.state.email, 'me@example.com');
 });
+
+test('changed response format → numbers still shown, warning + report link', () => {
+  const fs = require('fs'), os = require('os');
+  const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'usage-pro.json'), 'utf8'));
+  raw.limits = raw.limits.map(({ percent, ...l }) => ({ ...l, pct_used: percent }));
+  const file = path.join(os.tmpdir(), `clausage-changed-${process.pid}.json`);
+  fs.writeFileSync(file, JSON.stringify(raw));
+  try {
+    const r = run({ FIXTURE: file });
+    assert.equal(r.state.status, 'ok');
+    assert.ok(r.state.windows.length);
+    assert.deepEqual(r.state.formatIssues, ['limit-no-percent']);
+    assert.equal(r.state.reportable, true);
+  } finally { fs.unlinkSync(file); }
+});

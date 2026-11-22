@@ -105,3 +105,21 @@ test('run-out prediction: average pace, recent pace, exhausted, idle', () => {
   st = mk(45); addEta(st, h, now);
   assert.equal(st.windows[0].eta.at, null);
 });
+
+test('format check: real response is clean, format changes are flagged', () => {
+  const { formatIssues, normalize } = require('../src/usage');
+  const check = (raw) => formatIssues(raw, normalize({ raw, plan: 'Pro', orgName: '' }).windows);
+  assert.deepEqual(check(fixture), []);
+  assert.equal(normalize({ raw: fixture, plan: 'Pro', orgName: '' }).formatIssues, undefined);
+  // null means "unused", not a format change
+  assert.deepEqual(check({ limits: [{ kind: 'session', percent: null, resets_at: null }] }), []);
+  // percent field renamed → would silently show 0%
+  assert.deepEqual(check({ limits: [{ kind: 'session', pct_used: 45, resets_at: '2026-11-21T16:49:59Z' }] }), ['limit-no-percent']);
+  assert.deepEqual(check({ limits: [{ kind: 'session', percent: 'high' }] }), ['bad-percent']);
+  assert.deepEqual(check({ five_hour: { utilization: 30, resets_at: 'in 2 hours' } }), ['bad-reset']);
+  // kinds renamed → no 5-hour / weekly bar, only "other" bars
+  assert.deepEqual(check({ limits: [{ kind: 'rolling_window', percent: 45 }] }), ['no-primary']);
+  assert.deepEqual(check({ limits: { session: 45 } }), ['limits-not-array']);
+  const st = normalize({ raw: { limits: [{ kind: 'session', pct_used: 45 }] }, plan: 'Pro', orgName: '' });
+  assert.deepEqual(st.formatIssues, ['limit-no-percent']);
+});

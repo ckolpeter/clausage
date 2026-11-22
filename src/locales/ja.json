@@ -78,6 +78,7 @@
   "w.offline": "⚠ オフライン",
   "w.retrying": "⚠ {s} 秒後に再試行",
   "w.report": "この問題を報告",
+  "w.formatChanged": "claude.ai の使用量データの形式が変わったため、一部の数値が正しくない可能性があります。Clausage を更新してください。",
   "s.thresholds": "通知するしきい値（%）",
   "s.quiet": "おやすみ時間",
   "s.hideOnFullscreen": "他のアプリが全画面のときは隠す（ゲーム、スライド、動画）",

@@ -78,6 +78,7 @@
   "w.offline": "⚠ Hors ligne",
   "w.retrying": "⚠ Nouvel essai dans {s} s",
   "w.report": "Signaler ce problème",
+  "w.formatChanged": "claude.ai a modifié le format de ses données d’utilisation : certains chiffres peuvent être faux. Essayez de mettre Clausage à jour.",
   "s.thresholds": "Notifier à (%)",
   "s.quiet": "Heures calmes",
   "s.hideOnFullscreen": "Masquer quand une autre app est en plein écran (jeux, présentations, vidéo)",

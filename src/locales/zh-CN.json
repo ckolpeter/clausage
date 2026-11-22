@@ -78,6 +78,7 @@
   "w.offline": "⚠ 离线中",
   "w.retrying": "⚠ {s} 秒后重试",
   "w.report": "报告这个问题",
+  "w.formatChanged": "claude.ai 的用量数据格式变了，部分数字可能不准确，请尝试更新 Clausage。",
   "s.thresholds": "通知阈值（%）",
   "s.quiet": "勿扰时段",
   "s.hideOnFullscreen": "其他程序全屏时自动隐藏（游戏、演示、视频）",

@@ -78,6 +78,7 @@
   "w.offline": "⚠ Offline",
   "w.retrying": "⚠ Retrying in {s}s",
   "w.report": "Report this problem",
+  "w.formatChanged": "claude.ai changed its usage data format, so some numbers may be wrong. Try updating Clausage.",
   "s.thresholds": "Notify at usage %",
   "s.quiet": "Quiet hours",
   "s.hideOnFullscreen": "Hide while another app is full screen (games, slides, video)",

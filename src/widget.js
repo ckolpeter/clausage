@@ -187,7 +187,13 @@ function render() {
     if (!opts.compact && data.spend) html += spendHtml(data.spend);
     if (!opts.compact && opts.showBreakdown && data.breakdown) html += breakdownHtml(data.breakdown);
     if (!opts.compact && opts.showCodeStats && state.code) html += codeHtml(state.code);
+    // claude.ai changed the response format in a way that may make these numbers wrong
+    if (data.formatIssues) {
+      html = `<div class="fwarn" title="${esc(data.formatIssues.join(', '))}">⚠ ${esc(t('w.formatChanged'))} `
+        + `<a id="lnkReport">${esc(t('w.report'))}</a></div>` + html;
+    }
     $('content').innerHTML = html;
+    $('lnkReport')?.addEventListener('click', () => window.api.openIssue());
     $('updated').textContent = data.fetchedAt
       ? t('w.updatedAt', { time: new Date(data.fetchedAt).toLocaleTimeString(LANG, { hour: '2-digit', minute: '2-digit' }) })
       : '';

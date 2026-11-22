@@ -132,6 +132,7 @@ let pollTimer = null;
 let resetTimer = null;
 let retryTimer = null;
 let failCount = 0;      // consecutive non-auth failures, for retry backoff
+let lastFormatWarn = '';  // last logged format-issue set, so each change is logged once
 let refreshing = null;  // in-flight refresh, so overlapping triggers share one request
 let history = null;
 let updater = null;
@@ -362,6 +363,15 @@ function labelOf(w) {
 // ---------------------------------------------------------------- main loop
 const ISSUES_URL = 'https://github.com/ckolpeter/clausage/issues/new?template=bug_report.yml';
 
+/** Bug-report link prefilled with the version and what went wrong (error key / format issue codes only — no personal data) */
+function issueUrl(state) {
+  const what = state?.formatIssues?.length
+    ? `Usage format check failed: ${state.formatIssues.join(', ')}`
+    : state?.msgKey ? `Error: ${state.msgKey}${state.msgVars?.status ? ` (${state.msgVars.status})` : ''}` : '';
+  const q = new URLSearchParams({ version: `v${app.getVersion()}`, ...(what ? { what } : {}) });
+  return `${ISSUES_URL}&${q}`;
+}
+
 /** Network-level failures (no response at all) as opposed to HTTP errors */
 function isNetworkError(e) {
   const m = String(e?.message || e || '');
@@ -407,6 +417,12 @@ async function doRefresh() {
     if (!lastState.windows.length) lastState = { status: 'error', msgKey: 'err.noData', reportable: true };
     else {
       failCount = 0;
+      if (lastState.formatIssues) {
+        // Still show the numbers, but warn that they may be wrong and offer a report link
+        lastState.reportable = true;
+        const key = lastState.formatIssues.join(',');
+        if (key !== lastFormatWarn) { console.warn('[usage] response format changed:', key); lastFormatWarn = key; }
+      } else lastFormatWarn = '';
       history?.add(lastState);
       addEta(lastState);
       maybeNotify(lastState);
@@ -905,7 +921,7 @@ ipcMain.on('refresh', () => refresh());
 ipcMain.on('login', () => openLogin());
 ipcMain.on('open-settings', () => openSettings());
 ipcMain.on('open-history', () => openHistory());
-ipcMain.on('open-issue', () => shell.openExternal(ISSUES_URL));
+ipcMain.on('open-issue', () => shell.openExternal(issueUrl(lastState)));
 ipcMain.handle('history:get', () => {
   const now = Date.now();
   return {
