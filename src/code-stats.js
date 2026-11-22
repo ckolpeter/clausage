@@ -7,7 +7,7 @@
  * ({ input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens }).
  * We sum those per model for "today" and "last 7 days". Everything stays on this computer.
  *
- * Files are parsed once and cached by (size, mtime), so a refresh only re-reads files that changed.
+ * Files are cached by (size, mtime); when a file grows, only the appended bytes are read.
  */
 const fs = require('fs');
 const path = require('path');
@@ -35,7 +35,7 @@ function prettyModel(id) {
 
 class CodeStats {
   constructor() {
-    this.cache = new Map(); // file → { size, mtimeMs, entries: [{ t, id, model, tokens }] }
+    this.cache = new Map(); // file → { size, mtimeMs, offset, entries: [{ t, id, model, tokens }] }
   }
 
   available() { return configDirs().length > 0; }
@@ -62,10 +62,29 @@ class CodeStats {
     return out;
   }
 
-  parseFile(file) {
+  /**
+   * Parse complete lines from byte `from` to `size`. Returns { entries, offset }, where offset is just past
+   * the last newline read, so a line still being written is picked up next time.
+   */
+  parseFile(file, from = 0, size = Infinity) {
     const entries = [];
-    let text;
-    try { text = fs.readFileSync(file, 'utf8'); } catch { return entries; }
+    let buf;
+    try {
+      const fd = fs.openSync(file, 'r');
+      try {
+        const len = Math.max(0, Math.min(size, fs.fstatSync(fd).size) - from);
+        buf = Buffer.alloc(len);
+        let got = 0;
+        while (got < len) {
+          const n = fs.readSync(fd, buf, got, len - got, from + got);
+          if (!n) break;
+          got += n;
+        }
+        buf = buf.subarray(0, got);
+      } finally { fs.closeSync(fd); }
+    } catch { return { entries, offset: from }; }
+    const end = buf.lastIndexOf(0x0a) + 1; // cut on a byte boundary: '\n' never occurs inside a UTF-8 sequence
+    const text = buf.toString('utf8', 0, end);
     for (const line of text.split('\n')) {
       if (!line || line.indexOf('"usage"') < 0) continue;
       let j;
@@ -85,7 +104,7 @@ class CodeStats {
       const id = msg.id && j.requestId ? `${msg.id}:${j.requestId}` : msg.id || null;
       entries.push({ t, id, model: msg.model, tokens });
     }
-    return entries;
+    return { entries, offset: from + end };
   }
 
   /**
@@ -100,8 +119,16 @@ class CodeStats {
     for (const f of files) {
       live.add(f.file);
       const c = this.cache.get(f.file);
-      if (!c || c.size !== f.size || c.mtimeMs !== f.mtimeMs) {
-        this.cache.set(f.file, { size: f.size, mtimeMs: f.mtimeMs, entries: this.parseFile(f.file) });
+      if (c && c.size === f.size && c.mtimeMs === f.mtimeMs) continue;
+      if (c && f.size > c.size) {
+        // Claude Code only appends: read just the new bytes
+        const r = this.parseFile(f.file, c.offset, f.size);
+        for (const e of r.entries) c.entries.push(e);
+        Object.assign(c, { size: f.size, mtimeMs: f.mtimeMs, offset: r.offset });
+      } else {
+        // New, shrunk or rewritten file: read it all
+        const r = this.parseFile(f.file, 0, f.size);
+        this.cache.set(f.file, { size: f.size, mtimeMs: f.mtimeMs, offset: r.offset, entries: r.entries });
       }
     }
     for (const k of this.cache.keys()) if (!live.has(k)) this.cache.delete(k);

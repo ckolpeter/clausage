@@ -59,6 +59,39 @@ test('Claude Code stats: per-model totals, dedupe, today vs 7 days', () => {
   }
 });
 
+test('Claude Code stats: appended lines are read incrementally, half-written lines wait', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clausage-cc-'));
+  fs.mkdirSync(path.join(dir, 'projects', 'p'), { recursive: true });
+  const file = path.join(dir, 'projects', 'p', 's.jsonl');
+  const now = Date.now();
+  const line = (id, o) => JSON.stringify({
+    type: 'assistant', timestamp: new Date(now - 60e3).toISOString(), requestId: 'r' + id, note: '測試 ✓',
+    message: { id, model: 'claude-opus-4-5', usage: { input_tokens: 0, output_tokens: o, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } },
+  });
+  const prev = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = dir;
+  try {
+    const { CodeStats } = require('../src/code-stats');
+    const cs = new CodeStats();
+    const total = (t) => cs.compute(t).week[0].total;
+    const second = line('b', 20);
+    fs.writeFileSync(file, line('a', 10) + '\n' + second.slice(0, 25)); // second line still being written
+    assert.equal(total(now), 10);
+    const offset = [...cs.cache.values()][0].offset;
+    fs.appendFileSync(file, second.slice(25) + '\n' + line('c', 30) + '\n');
+    let readFrom = null;
+    const orig = cs.parseFile.bind(cs);
+    cs.parseFile = (f, from, size) => { readFrom = from; return orig(f, from, size); };
+    assert.equal(total(now + 1), 60);
+    assert.equal(readFrom, offset);                   // only the new bytes were read
+    fs.writeFileSync(file, line('d', 5) + '\n');      // file rewritten (shrunk) → full re-read
+    assert.equal(total(now + 2), 5);
+    assert.equal(readFrom, 0);
+  } finally {
+    if (prev === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = prev;
+  }
+});
+
 test('locales: same keys, placeholders and tags as English', () => {
   const dir = path.join(__dirname, '..', 'src', 'locales');
   const en = JSON.parse(fs.readFileSync(path.join(dir, 'en.json'), 'utf8'));
