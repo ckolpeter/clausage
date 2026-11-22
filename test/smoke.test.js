@@ -51,6 +51,14 @@ test('network failure → network error, retry, not reportable', () => {
   assert.equal(r.state.reportable, false);
 });
 
+test('hung request → gives up after the timeout, network error, retry', () => {
+  const r = run({ HANG: '1', CLAUSAGE_TIMEOUT_MS: '150', WAIT_MS: '1200' });
+  assert.equal(r.state.status, 'error');
+  assert.equal(r.state.msgKey, 'err.network');
+  assert.ok(r.state.retryAt);
+  assert.equal(r.state.refreshing, undefined);
+});
+
 test('extra accounts are fetched alongside the main one', () => {
   const r = run({ PRECONFIG: JSON.stringify({ accounts: [{ partition: 'persist:claude-acct-x', email: 'work@example.com' }] }) });
   assert.deepEqual(r.state.others.map(o => [o.email, o.status]), [['work@example.com', 'ok']]);

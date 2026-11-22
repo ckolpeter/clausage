@@ -22,6 +22,7 @@ const { Updater } = require('./updater');
 const { CodeStats } = require('./code-stats');
 const { FullscreenWatcher } = require('./fullscreen');
 const { writeFileAtomic, Debounced } = require('./store');
+const { withTimeout } = require('./timeout');
 const usage = require('./usage');
 const { planOf, hasUsage } = usage;
 
@@ -134,6 +135,8 @@ let retryTimer = null;
 let failCount = 0;      // consecutive non-auth failures, for retry backoff
 let lastFormatWarn = '';  // last logged format-issue set, so each change is logged once
 let refreshing = null;  // in-flight refresh, so overlapping triggers share one request
+// Per-request limit, so a hung request can't stall refreshing forever (env override for tests)
+const REQUEST_TIMEOUT_MS = Number(process.env.CLAUSAGE_TIMEOUT_MS) || 20e3;
 let history = null;
 let updater = null;
 const codeStats = new CodeStats();
@@ -171,12 +174,14 @@ async function getCookie(name, part = PARTITION) {
 async function claudeGetJson(pathname, part = PARTITION) {
   const url = CLAUDE + pathname;
   try {
-    const r = await ses(part).fetch(url, {
-      credentials: 'include',
-      headers: { accept: 'application/json', 'content-type': 'application/json' },
-    });
+    const { r, text } = await withTimeout(async (signal) => {
+      const r = await ses(part).fetch(url, {
+        credentials: 'include', signal,
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+      });
+      return { r, text: await r.text() };
+    }, REQUEST_TIMEOUT_MS);
     if (r.status === 401) throw new AuthError('err.sessionExpired');
-    const text = await r.text();
     if (r.ok) return JSON.parse(text);
     if (r.status === 403 && /permission_error|account_session_invalid/i.test(text)) throw new AuthError('err.sessionInvalid');
     // Anything else (usually a Cloudflare 403/503) → fall back to in-page fetch
@@ -195,7 +200,7 @@ async function ensureFetcherWin(part) {
     webPreferences: { partition: part, contextIsolation: true, sandbox: true },
   });
   fetcherWins.set(part, w);
-  await w.loadURL(CLAUDE + '/robots.txt').catch(() => {});
+  await withTimeout(() => w.loadURL(CLAUDE + '/robots.txt'), REQUEST_TIMEOUT_MS).catch(() => {});
   return w;
 }
 
@@ -207,12 +212,18 @@ function destroyFetcher(part) {
 
 async function pageFetchJson(url, part = PARTITION) {
   const w = await ensureFetcherWin(part);
-  const res = await w.webContents.executeJavaScript(
-    `fetch(${JSON.stringify(url)}, {credentials:'include', headers:{accept:'application/json'}})
-       .then(async r => ({ status: r.status, body: await r.text() }))
-       .catch(e => ({ status: 0, body: String(e) }))`,
-    true,
-  );
+  let res;
+  try {
+    res = await withTimeout(() => w.webContents.executeJavaScript(
+      `fetch(${JSON.stringify(url)}, {credentials:'include', headers:{accept:'application/json'}, signal: AbortSignal.timeout(${REQUEST_TIMEOUT_MS})})
+         .then(async r => ({ status: r.status, body: await r.text() }))
+         .catch(e => ({ status: 0, body: String(e) }))`,
+      true,
+    ), REQUEST_TIMEOUT_MS + 2000);
+  } catch (e) {
+    destroyFetcher(part); // the page may be stuck: start with a fresh one next time
+    throw e;
+  }
   if (res.status === 0) throw new TypeError(`fetch failed: ${res.body}`);
   if (res.status === 401 || res.status === 403) throw new AuthError('err.sessionExpired');
   if (res.status < 200 || res.status >= 300) throw new AppError('err.http', { host: 'claude.ai', status: res.status });
@@ -322,17 +333,20 @@ async function readClaudeCodeCreds() {
 
 async function fetchCodeUsage() {
   const { token, plan } = await readClaudeCodeCreds();
-  const r = await fetch('https://api.anthropic.com/api/oauth/usage', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'anthropic-beta': 'oauth-2025-04-20',
-      'Content-Type': 'application/json',
-      'User-Agent': `clausage/${app.getVersion()}`,
-    },
-  });
+  const { r, raw } = await withTimeout(async (signal) => {
+    const r = await fetch('https://api.anthropic.com/api/oauth/usage', {
+      signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'anthropic-beta': 'oauth-2025-04-20',
+        'Content-Type': 'application/json',
+        'User-Agent': `clausage/${app.getVersion()}`,
+      },
+    });
+    return { r, raw: r.ok ? await r.json() : null };
+  }, REQUEST_TIMEOUT_MS);
   if (r.status === 401) throw new AuthError('err.ccInvalid');
   if (!r.ok) throw new AppError('err.http', { host: 'api.anthropic.com', status: r.status });
-  const raw = await r.json();
   dumpDebug('code-usage.json', { fetchedAt: new Date().toISOString(), plan, raw });
   return { raw, plan, orgName: '' };
 }

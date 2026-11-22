@@ -40,6 +40,16 @@ test('store: atomic write replaces the file and leaves no temp file; debounce + 
   assert.equal(runs, 1);
 });
 
+test('withTimeout: passes results through, gives up on hung requests', async () => {
+  const { withTimeout } = require('../src/timeout');
+  assert.equal(await withTimeout(async () => 42, 1000), 42);
+  await assert.rejects(withTimeout(async () => { throw new Error('boom'); }, 1000), /boom/);
+  let sig;
+  await assert.rejects(withTimeout((s) => { sig = s; return new Promise(() => {}); }, 30),
+    (e) => e instanceof TypeError && /timed out/.test(e.message));
+  assert.equal(sig.aborted, true); // the underlying request is cancelled too
+});
+
 test('history: flush() writes a pending sample immediately (quit)', () => {
   const { History } = require('../src/history');
   const file = path.join(os.tmpdir(), `clausage-hist-flush-${process.pid}.json`);

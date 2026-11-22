@@ -1,5 +1,5 @@
 // Minimal Electron stand-in so test/smoke.test.js can run src/main.js under plain Node.
-// Env: FIXTURE (usage JSON), OFFLINE, NETFAIL, PRECONFIG (config.json contents), VERBOSE.
+// Env: FIXTURE (usage JSON), OFFLINE, NETFAIL, HANG (requests never answer), PRECONFIG (config.json contents), VERBOSE.
 const os = require('os'), path = require('path'), fs = require('fs');
 const fixture = JSON.parse(fs.readFileSync(process.env.FIXTURE, 'utf8'));
 const log = (...a) => { if (process.env.VERBOSE) console.log('[fake]', ...a); };
@@ -43,7 +43,7 @@ const responses = {
 };
 const session = { fromPartition: (p) => ({
   cookies: { get: async ({ name }) => (cookieJar[name] ? [{ value: cookieJar[name] }] : []), set: async () => {} },
-  fetch: async (url) => { if (process.env.NETFAIL) throw new TypeError('fetch failed'); const u = new URL(url); const body = responses[u.pathname]; log('fetch', u.pathname);
+  fetch: async (url) => { if (process.env.NETFAIL) throw new TypeError('fetch failed'); if (process.env.HANG) return new Promise(() => {}); const u = new URL(url); const body = responses[u.pathname]; log('fetch', u.pathname);
     return { status: body ? 200 : 404, ok: !!body, text: async () => JSON.stringify(body ?? {}) }; },
   setUserAgent() {}, clearStorageData: async () => {},
 }) };

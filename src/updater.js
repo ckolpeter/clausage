@@ -59,6 +59,7 @@ class Updater {
   async checkGitHub() {
     try {
       const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+        signal: AbortSignal.timeout(30e3),
         headers: { Accept: 'application/vnd.github+json', 'User-Agent': `clausage/${app.getVersion()}` },
       });
       if (!r.ok) return;
