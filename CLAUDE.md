@@ -60,5 +60,6 @@ Release: `npm version x.y.z && git push --follow-tags` → GitHub Actions builds
 - **Single instance:** `npm start` exits silently (prints a message) if Clausage is already running — quit it from the tray or `taskkill /IM electron.exe /F`.
 - `npm start` dies with its terminal; for daily use install the built app. "Launch at login" only makes sense in the installed build.
 - Linux `.deb` needs `author.email` / `linux.maintainer` with an email (we use `ckolpeter@users.noreply.github.com`).
+- **macOS runner capacity:** `macos-latest` (arm64) jobs are sometimes never started ("not acquired by Runner", cancelled after ~15 min). `build.yml` then runs `mac-fallback` on `macos-26-intel` automatically; the run still shows as failed, so check that every job but the cancelled one passed. Build steps live in `build-one.yml` (reusable).
 - macOS builds are unsigned (no Apple Developer account yet) → can't self-update; updater falls back to a release link.
 - Name: keep **Clausage**. `ccusage` is an unrelated, popular project (ryoppippi/ccusage) — don't rename to it.

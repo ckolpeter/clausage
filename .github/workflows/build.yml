@@ -1,5 +1,6 @@
 # 推送到 main / 發 PR：三平台建置檢查（不發佈）
 # 推送 v* 標籤（例如 v0.1.0）：三平台建置並上傳到 GitHub Release 草稿
+# 實際步驟在 build-one.yml
 name: Build
 
 on:
@@ -20,59 +21,30 @@ jobs:
         include:
           - os: windows-latest
             target: --win
-          - os: macos-latest
-            target: --mac
           - os: ubuntu-latest
             target: --linux
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v5
+    uses: ./.github/workflows/build-one.yml
+    with:
+      os: ${{ matrix.os }}
+      target: ${{ matrix.target }}
+    secrets: inherit
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
+  mac:
+    uses: ./.github/workflows/build-one.yml
+    with:
+      os: macos-latest
+      target: --mac
+    secrets: inherit
 
-      # 有 package-lock.json 時用 npm ci，否則 npm install
-      - name: Install
-        shell: bash
-        run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-      - name: Syntax check
-        shell: bash
-        run: for f in src/*.js; do node --check "$f"; done
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Build
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 尚未設定簽章：停用 macOS 自動尋找憑證
-          # 之後加入簽章時，設定 secrets：CSC_LINK、CSC_KEY_PASSWORD、APPLE_ID、APPLE_APP_SPECIFIC_PASSWORD、APPLE_TEAM_ID
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK == '' && 'false' || 'true' }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        run: |
-          # 沒有憑證時 CSC_LINK 會是空字串，electron-builder 會把它當成專案資料夾去簽章 → 「not a file」
-          if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD; fi
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            npx electron-builder ${{ matrix.target }} --publish always
-          else
-            npx electron-builder ${{ matrix.target }} --publish never
-          fi
-
-      - name: Upload artifacts
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: clausage-${{ matrix.os }}
-          path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.zip
-            dist/*.AppImage
-            dist/*.deb
-          if-no-files-found: ignore
-          retention-days: 7
+  # GitHub 的 macOS arm64 機器常常不夠用：排不到機器時工作會在約 15 分鐘後被取消
+  # （"The job was not acquired by Runner…"）。這時改在另一批 Intel 機器上建置。
+  # 產生的是 universal 版本，在 Intel 上建出來的 dmg / zip 一樣。
+  # 如果 arm64 失敗是程式本身的問題，這裡也會失敗，只是多花幾分鐘。
+  mac-fallback:
+    needs: mac
+    if: ${{ always() && needs.mac.result != 'success' && needs.mac.result != 'skipped' }}
+    uses: ./.github/workflows/build-one.yml
+    with:
+      os: macos-26-intel
+      target: --mac
+    secrets: inherit
