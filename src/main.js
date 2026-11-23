@@ -424,6 +424,10 @@ async function doRefresh() {
   push({ ...lastState, refreshing: true });
   // Extra accounts are fetched in parallel with the main one and never throw
   const othersP = fetchOthers();
+  // Claude Code stats read local files; run that alongside the network requests
+  const codeP = config.showCodeStats
+    ? codeStats.compute().catch(e => { console.error('[code-stats]', e); return null; })
+    : Promise.resolve(null);
   try {
     const data = config.source === 'code' ? await fetchCodeUsage() : await fetchWebUsage();
     const prevOk = lastState.status === 'ok' ? lastState : lastState.prev;
@@ -468,9 +472,7 @@ async function doRefresh() {
     rememberEmail(PARTITION).then(() => { lastState.email = config.mainEmail; push(lastState); });
   }
   lastState.email = config.source === 'web' ? config.mainEmail : '';
-  if (config.showCodeStats) {
-    try { lastState.code = codeStats.compute(); } catch (e) { console.error('[code-stats]', e); lastState.code = null; }
-  } else lastState.code = null;
+  lastState.code = await codeP;
   push(lastState);
   updateTray();
 }
@@ -996,7 +998,10 @@ ipcMain.handle('settings:set', async (_e, patch) => {
   if ('trayMetric' in patch) trayIconKey = '';
   if ('autoUpdate' in patch) updater?.start(config.autoUpdate);
   if ('scale' in patch) applyScale();
-  if ('showCodeStats' in patch) { lastState.code = config.showCodeStats ? codeStats.compute() : null; }
+  if ('showCodeStats' in patch) {
+    lastState.code = null;
+    if (config.showCodeStats) codeStats.compute().then(c => { lastState.code = c; push(lastState); }).catch(e => console.error('[code-stats]', e));
+  }
   if ('clickThrough' in patch) applyClickThrough();
   if ('hideOnFullscreen' in patch) applyFullscreenMode();
   if ('hotkey' in patch) hotkeyOk = registerHotkeys();

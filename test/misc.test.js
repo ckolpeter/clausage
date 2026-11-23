@@ -88,7 +88,7 @@ test('version comparison', () => {
   assert.equal(newer('1.0.0', '0.99.99'), true);
 });
 
-test('Claude Code stats: per-model totals, dedupe, today vs 7 days', () => {
+test('Claude Code stats: per-model totals, dedupe, today vs 7 days', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clausage-cc-'));
   fs.mkdirSync(path.join(dir, 'projects', 'p'), { recursive: true });
   const now = Date.now(), D = 24 * 3600e3;
@@ -107,7 +107,7 @@ test('Claude Code stats: per-model totals, dedupe, today vs 7 days', () => {
   process.env.CLAUDE_CONFIG_DIR = dir;
   try {
     const { CodeStats, prettyModel } = require('../src/code-stats');
-    const r = new CodeStats().compute(now);
+    const r = await new CodeStats().compute(now);
     assert.deepEqual(r.week.map(x => [x.name, x.total]), [['Opus 4.5', 1000], ['Sonnet 4', 100]]);
     assert.deepEqual(r.today.map(x => x.name), ['Opus 4.5']);
     assert.equal(prettyModel('claude-3-5-sonnet-20241022'), 'Sonnet 3.5');
@@ -117,7 +117,7 @@ test('Claude Code stats: per-model totals, dedupe, today vs 7 days', () => {
   }
 });
 
-test('Claude Code stats: appended lines are read incrementally, half-written lines wait', () => {
+test('Claude Code stats: appended lines are read incrementally, half-written lines wait', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clausage-cc-'));
   fs.mkdirSync(path.join(dir, 'projects', 'p'), { recursive: true });
   const file = path.join(dir, 'projects', 'p', 's.jsonl');
@@ -131,19 +131,26 @@ test('Claude Code stats: appended lines are read incrementally, half-written lin
   try {
     const { CodeStats } = require('../src/code-stats');
     const cs = new CodeStats();
-    const total = (t) => cs.compute(t).week[0].total;
+    const total = async (t) => (await cs.compute(t)).week[0].total;
     const second = line('b', 20);
     fs.writeFileSync(file, line('a', 10) + '\n' + second.slice(0, 25)); // second line still being written
-    assert.equal(total(now), 10);
+    assert.equal(await total(now), 10);
     const offset = [...cs.cache.values()][0].offset;
     fs.appendFileSync(file, second.slice(25) + '\n' + line('c', 30) + '\n');
     let readFrom = null;
     const orig = cs.parseFile.bind(cs);
     cs.parseFile = (f, from, size) => { readFrom = from; return orig(f, from, size); };
-    assert.equal(total(now + 1), 60);
+    assert.equal(await total(now + 1), 60);
     assert.equal(readFrom, offset);                   // only the new bytes were read
     fs.writeFileSync(file, line('d', 5) + '\n');      // file rewritten (shrunk) → full re-read
-    assert.equal(total(now + 2), 5);
+    assert.equal(await total(now + 2), 5);
+
+    // Small chunks: lines (with multi-byte text) split across chunk boundaries are still read whole
+    fs.writeFileSync(file, [line('e', 1), line('f', 2), line('g', 4)].join('\n') + '\n');
+    const small = new CodeStats(); small.chunk = 37;
+    assert.equal((await small.compute(now + 3)).week[0].total, 7);
+    // Overlapping calls share one run
+    assert.equal(small.compute(now + 4), small.compute(now + 4));
     assert.equal(readFrom, 0);
   } finally {
     if (prev === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = prev;

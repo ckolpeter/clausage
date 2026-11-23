@@ -149,7 +149,6 @@ function fmtTokens(n) {
 
 /** Claude Code tokens per model: today and last 7 days */
 function codeHtml(code) {
-  const week = new Map(code.week.map(r => [r.model, r]));
   const today = new Map(code.today.map(r => [r.model, r]));
   const rows = code.week.slice(0, 5).map(r => {
     const td = today.get(r.model);

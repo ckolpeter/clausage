@@ -8,12 +8,15 @@
  * We sum those per model for "today" and "last 7 days". Everything stays on this computer.
  *
  * Files are cached by (size, mtime); when a file grows, only the appended bytes are read.
+ * Reading is async and chunked, so a large first read (hundreds of MB for heavy users) doesn't
+ * freeze the main process (widget dragging, tray menu) while it runs.
  */
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 const DAY = 24 * 3600e3;
+const CHUNK = 1024 * 1024; // bytes read (and parsed) per step
 const WINDOW_MS = 7 * DAY;
 
 function configDirs() {
@@ -36,6 +39,8 @@ function prettyModel(id) {
 class CodeStats {
   constructor() {
     this.cache = new Map(); // file → { size, mtimeMs, offset, entries: [{ t, id, model, tokens }] }
+    this.chunk = CHUNK;
+    this.running = null;
   }
 
   available() { return configDirs().length > 0; }
@@ -62,29 +67,8 @@ class CodeStats {
     return out;
   }
 
-  /**
-   * Parse complete lines from byte `from` to `size`. Returns { entries, offset }, where offset is just past
-   * the last newline read, so a line still being written is picked up next time.
-   */
-  parseFile(file, from = 0, size = Infinity) {
-    const entries = [];
-    let buf;
-    try {
-      const fd = fs.openSync(file, 'r');
-      try {
-        const len = Math.max(0, Math.min(size, fs.fstatSync(fd).size) - from);
-        buf = Buffer.alloc(len);
-        let got = 0;
-        while (got < len) {
-          const n = fs.readSync(fd, buf, got, len - got, from + got);
-          if (!n) break;
-          got += n;
-        }
-        buf = buf.subarray(0, got);
-      } finally { fs.closeSync(fd); }
-    } catch { return { entries, offset: from }; }
-    const end = buf.lastIndexOf(0x0a) + 1; // cut on a byte boundary: '\n' never occurs inside a UTF-8 sequence
-    const text = buf.toString('utf8', 0, end);
+  /** Usage entries in a block of complete JSONL lines */
+  parseLines(text, entries) {
     for (const line of text.split('\n')) {
       if (!line || line.indexOf('"usage"') < 0) continue;
       let j;
@@ -104,14 +88,48 @@ class CodeStats {
       const id = msg.id && j.requestId ? `${msg.id}:${j.requestId}` : msg.id || null;
       entries.push({ t, id, model: msg.model, tokens });
     }
-    return { entries, offset: from + end };
   }
 
   /**
-   * Returns { today: [{ model, name, tokens:{...}, total }], week: [...], updatedAt } or null if no data.
+   * Parse complete lines from byte `from` to `size`, CHUNK bytes at a time. Returns { entries, offset },
+   * where offset is just past the last newline read, so a line still being written is picked up next time.
+   */
+  async parseFile(file, from = 0, size = Infinity) {
+    const entries = [];
+    let fh;
+    try { fh = await fs.promises.open(file, 'r'); } catch { return { entries, offset: from }; }
+    let offset = from;
+    let carry = Buffer.alloc(0); // start of a line that continues in the next chunk
+    try {
+      const stop = Math.min(size, (await fh.stat()).size);
+      let pos = from;
+      while (pos < stop) {
+        const want = Math.min(this.chunk, stop - pos);
+        const buf = Buffer.alloc(want);
+        const { bytesRead } = await fh.read(buf, 0, want, pos);
+        if (!bytesRead) break;
+        pos += bytesRead;
+        const data = carry.length ? Buffer.concat([carry, buf.subarray(0, bytesRead)]) : buf.subarray(0, bytesRead);
+        const end = data.lastIndexOf(0x0a) + 1; // cut on a byte boundary: '\n' never occurs inside a UTF-8 sequence
+        this.parseLines(data.toString('utf8', 0, end), entries);
+        offset += end;
+        carry = data.subarray(end);
+      }
+    } catch { /* keep what was read */ } finally { await fh.close().catch(() => {}); }
+    return { entries, offset };
+  }
+
+  /**
+   * Resolves to { today: [{ model, name, tokens:{...}, total }], week: [...], updatedAt } or null if no data.
    * "today" starts at local midnight.
    */
   compute(now = Date.now()) {
+    // Overlapping calls (refresh + settings change) share one run, so appended bytes aren't read twice
+    if (!this.running) this.running = this.run(now).finally(() => { this.running = null; });
+    return this.running;
+  }
+
+  async run(now) {
     if (!this.available()) return null;
     const since = now - WINDOW_MS;
     const files = this.listFiles(since);
@@ -122,12 +140,12 @@ class CodeStats {
       if (c && c.size === f.size && c.mtimeMs === f.mtimeMs) continue;
       if (c && f.size > c.size) {
         // Claude Code only appends: read just the new bytes
-        const r = this.parseFile(f.file, c.offset, f.size);
+        const r = await this.parseFile(f.file, c.offset, f.size);
         for (const e of r.entries) c.entries.push(e);
         Object.assign(c, { size: f.size, mtimeMs: f.mtimeMs, offset: r.offset });
       } else {
         // New, shrunk or rewritten file: read it all
-        const r = this.parseFile(f.file, 0, f.size);
+        const r = await this.parseFile(f.file, 0, f.size);
         this.cache.set(f.file, { size: f.size, mtimeMs: f.mtimeMs, offset: r.offset, entries: r.entries });
       }
     }

@@ -44,7 +44,7 @@ function stableReset(v) {
 /** Same usage window? Reset times within a few minutes of each other (windows are hours long) */
 const SAME_RESET_MS = 5 * 60e3;
 function sameReset(a, b) {
-  if (a == null || b == null) return a == b; // eslint-disable-line eqeqeq
+  if (a == null || b == null) return a == null && b == null;
   if (a === b) return true;
   const d = Math.abs(Date.parse(a) - Date.parse(b));
   return Number.isFinite(d) && d < SAME_RESET_MS;
