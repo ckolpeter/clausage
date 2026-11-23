@@ -66,6 +66,14 @@ test('threshold notification fires once per window even though resets_at jitters
   assert.match(r.state.windows[0].resetsAt, /:00.000Z$/); // rounded to the minute
 });
 
+test('a failed refresh keeps the last number in the tray instead of the plain icon', () => {
+  const win = run({ FAIL_AFTER: '1', REFRESHES: '1', SIM_PLATFORM: 'win32' });
+  assert.equal(win.state.status, 'error');
+  assert.equal(win.trayImageKind, 'drawn');
+  const mac = run({ FAIL_AFTER: '1', REFRESHES: '1', SIM_PLATFORM: 'darwin' });
+  assert.equal(mac.trayTitle.trim(), '45%');
+});
+
 test('extra accounts are fetched alongside the main one', () => {
   const r = run({ PRECONFIG: JSON.stringify({ accounts: [{ partition: 'persist:claude-acct-x', email: 'work@example.com' }] }) });
   assert.deepEqual(r.state.others.map(o => [o.email, o.status]), [['work@example.com', 'ok']]);

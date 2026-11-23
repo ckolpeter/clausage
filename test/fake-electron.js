@@ -1,5 +1,5 @@
 // Minimal Electron stand-in so test/smoke.test.js can run src/main.js under plain Node.
-// Env: FIXTURE (usage JSON), OFFLINE, NETFAIL, HANG (requests never answer), JITTER (resets_at moves ±0.6 s per request like the real API), PRECONFIG (config.json contents), VERBOSE.
+// Env: FIXTURE (usage JSON), OFFLINE, NETFAIL, HANG (requests never answer), FAIL_AFTER (usage requests after the first N fail), JITTER (resets_at moves ±0.6 s per request like the real API), PRECONFIG (config.json contents), VERBOSE.
 const os = require('os'), path = require('path'), fs = require('fs');
 const fixture = JSON.parse(fs.readFileSync(process.env.FIXTURE, 'utf8'));
 const log = (...a) => { if (process.env.VERBOSE) console.log('[fake]', ...a); };
@@ -34,7 +34,8 @@ class BrowserWindow {
   setAlwaysOnTop() {} setVisibleOnAllWorkspaces() {} setOpacity() {} setIgnoreMouseEvents(v) { this.ignore = v; }
   getBounds() { return { ...this.bounds }; } setBounds(b) { Object.assign(this.bounds, b); } setTitle() {}
 }
-const img = () => ({ isEmpty: () => false, resize() { return this; }, setTemplateImage() {}, addRepresentation() {} });
+const img = (kind) => ({ kind, isEmpty: () => false, resize() { return this; }, setTemplateImage() {}, addRepresentation() {} });
+let usageCalls = 0;
 const cookieJar = { sessionKey: 'sk-test', lastActiveOrg: 'org-1' };
 const responses = {
   '/api/organizations': [{ uuid: 'org-1', name: 'Test Org', capabilities: ['chat', 'claude_pro'], rate_limit_tier: 'default_claude_ai' }],
@@ -43,19 +44,20 @@ const responses = {
 };
 const session = { fromPartition: (p) => ({
   cookies: { get: async ({ name }) => (cookieJar[name] ? [{ value: cookieJar[name] }] : []), set: async () => {} },
-  fetch: async (url) => { if (process.env.NETFAIL) throw new TypeError('fetch failed'); if (process.env.HANG) return new Promise(() => {}); const u = new URL(url); let body = responses[u.pathname];
+  fetch: async (url) => { if (process.env.NETFAIL) throw new TypeError('fetch failed'); if (process.env.HANG) return new Promise(() => {});
+    if (process.env.FAIL_AFTER && url.endsWith('/usage') && ++usageCalls > Number(process.env.FAIL_AFTER)) throw new TypeError('fetch failed'); const u = new URL(url); let body = responses[u.pathname];
     if (process.env.JITTER && body === fixture) body = JSON.parse(JSON.stringify(body, (k, v) => (k === 'resets_at' && v ? new Date(Date.parse(v) + Math.round((Math.random() - 0.5) * 1200)).toISOString() : v))); log('fetch', u.pathname);
     return { status: body ? 200 : 404, ok: !!body, text: async () => JSON.stringify(body ?? {}) }; },
   setUserAgent() {}, clearStorageData: async () => {},
 }) };
 class Notification { static isSupported() { return true; } constructor(o) { this.o = o; } show() { (global.__notes ||= []).push(this.o); } }
-class Tray { constructor() {} on() {} setToolTip(t) { global.__tooltip = t; } setContextMenu() {} setImage() { global.__trayImage = true; } setTitle(t) { global.__trayTitle = t; } }
+class Tray { constructor() {} on() {} setToolTip(t) { global.__tooltip = t; } setContextMenu() {} setImage(i) { global.__trayImage = i?.kind || true; } setTitle(t) { global.__trayTitle = t; } }
 const display = { workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
 module.exports = {
   app, BrowserWindow, Tray, Notification, session,
   Menu: { buildFromTemplate: (t) => ({ t, popup() {} }) },
   ipcMain: { handle: (c, f) => (handlers[c] = f), on: (c, f) => (handlers[c] = f) },
-  nativeImage: { createFromPath: img, createFromDataURL: img },
+  nativeImage: { createFromPath: () => img('file'), createFromDataURL: () => img('drawn') },
   screen: { getPrimaryDisplay: () => display, getAllDisplays: () => [display], getDisplayMatching: () => display },
   powerMonitor: { on() {} }, shell: { openExternal() {}, showItemInFolder() {} },
   globalShortcut: { register: () => true, unregisterAll() {} },

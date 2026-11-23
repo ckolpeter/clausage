@@ -781,7 +781,7 @@ async function fetchOthers() {
     const base = { partition: acct.partition, email: acct.email || '' };
     try {
       const st = normalize(await fetchWebUsage(acct.partition));
-      addEta(st);
+      usage.addEta(st, null); // the local history belongs to the main account
       maybeNotify(st, acct.email);
       return { ...base, status: 'ok', plan: st.plan, windows: st.windows.filter(w => w.primary) };
     } catch (e) {
@@ -872,7 +872,9 @@ function buildMenu() {
 const TRAY_COLORS = { ok: '#2f8f55', warn: '#c98411', bad: '#cc3f35' };
 
 function trayMetricWindow() {
-  const ws = lastState.status === 'ok' ? lastState.windows : null;
+  // After a failed refresh keep the last known number, like the widget does, instead of flickering to the plain icon
+  const shown = lastState.status === 'ok' ? lastState : lastState.status === 'error' ? lastState.prev : null;
+  const ws = shown?.windows || null;
   if (!ws || config.trayMetric === 'off') return null;
   const five = ws.find(w => w.key === 'five_hour');
   const week = ws.find(w => w.key === 'seven_day');

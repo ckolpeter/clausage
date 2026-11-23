@@ -22,14 +22,14 @@ Module._resolveFilename = function (request, ...rest) {
 };
 require('../src/main.js');
 setTimeout(async () => {
-  const state = global.__sent.filter(s => s[0] === 'usage').pop()?.[1];
   const ipc = global.__ipc;
   for (let i = 0; i < Number(process.env.REFRESHES || 0); i++) await ipc.refresh();
+  const state = global.__sent.filter(s => s[0] === 'usage').pop()?.[1];
   const settings = await ipc['settings:get']();
   await ipc['settings:set']({}, { notifyThresholds: [95, 50, 200, 'x'] });
   const after = await ipc['settings:get']();
   process.stdout.write('\n@@RESULT@@' + JSON.stringify({
-    state, tooltip: global.__tooltip, trayImage: !!global.__trayImage, trayTitle: global.__trayTitle || '', platform: process.platform,
+    state, tooltip: global.__tooltip, trayImage: !!global.__trayImage, trayImageKind: global.__trayImage, trayTitle: global.__trayTitle || '', platform: process.platform,
     languages: settings.languages.length, notes: (global.__notes || []).map(n => n.title), thresholds: after.config.notifyThresholds,
   }));
   process.exit(0);
