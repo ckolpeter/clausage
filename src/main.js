@@ -23,6 +23,7 @@ const { CodeStats } = require('./code-stats');
 const { FullscreenWatcher } = require('./fullscreen');
 const { writeFileAtomic, Debounced } = require('./store');
 const { withTimeout } = require('./timeout');
+const { sanitize, applyPatch, cleanThresholds } = require('./config');
 const usage = require('./usage');
 const { planOf, hasUsage } = usage;
 
@@ -74,7 +75,7 @@ const DEFAULTS = {
 };
 let config = { ...DEFAULTS };
 function loadConfig() {
-  try { config = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG_PATH(), 'utf8')) }; }
+  try { config = sanitize({ ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG_PATH(), 'utf8')) }, DEFAULTS); }
   catch { config = { ...DEFAULTS }; }
 }
 const configSaver = new Debounced(() => {
@@ -118,8 +119,8 @@ function t(key, vars = {}) {
 }
 
 function setLanguage(pref) {
-  config.language = pref; saveConfig();
-  lang = resolveLang(pref);
+  config.language = sanitize({ ...config, language: pref }, DEFAULTS).language; saveConfig();
+  lang = resolveLang(config.language);
   for (const w of [widget, settingsWin, historyWin]) if (w && !w.isDestroyed()) w.webContents.reload();
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.setTitle(t('win.settings'));
   updateTray();
@@ -520,11 +521,7 @@ function notify(opts) {
   new Notification(opts).show();
 }
 
-function thresholds() {
-  const list = (Array.isArray(config.notifyThresholds) ? config.notifyThresholds : [80, 95])
-    .map(Number).filter(n => Number.isFinite(n) && n >= 1 && n <= 100);
-  return [...new Set(list)].sort((a, b) => a - b).slice(0, 5);
-}
+function thresholds() { return cleanThresholds(config.notifyThresholds, DEFAULTS.notifyThresholds); }
 
 function maybeNotify(state, who = '') {
   if (!config.notify) return;
@@ -986,12 +983,11 @@ ipcMain.handle('settings:get', async () => ({
   hotkeyOk,
 }));
 ipcMain.handle('settings:set', async (_e, patch) => {
+  patch = patch && typeof patch === 'object' && !Array.isArray(patch) ? { ...patch } : {};
   if ('language' in patch) { setLanguage(patch.language); delete patch.language; }
   const prevSource = config.source;
-  Object.assign(config, patch);
-  config.intervalSec = Math.max(30, Number(config.intervalSec) || 120);
-  if ('notifyThresholds' in patch) config.notifyThresholds = thresholds();
-  config.opacity = Math.max(0.3, Math.min(1, Number(config.opacity) || 1));
+  // Only user settings, validated (internal fields like accounts / bounds can't be set from here)
+  Object.assign(config, applyPatch(config, patch, DEFAULTS));
   widget?.setOpacity(config.opacity);
   applyTopmost();
   app.setLoginItemSettings({ openAtLogin: !!config.openAtLogin });

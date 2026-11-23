@@ -25,6 +25,16 @@ test('startup → fetch → widget state, tray, settings', () => {
   else assert.equal(r.trayImage, true);
   assert.equal(r.languages, 10);
   assert.deepEqual(r.thresholds, [50, 95]);
+  assert.equal(r.accountsAfter, 0); // the settings window can't add accounts
+});
+
+test('a broken config.json still starts with valid settings', () => {
+  const r = run({ PRECONFIG: JSON.stringify({ intervalSec: 'fast', theme: 7, scale: 'big', accounts: 'none', notifyThresholds: 'x' }) });
+  assert.equal(r.state.status, 'ok');
+  assert.equal(r.config.intervalSec, 120);
+  assert.equal(r.config.theme, 'dark');
+  assert.equal(r.config.scale, 1);
+  assert.deepEqual(r.config.accounts, []);
 });
 
 test('tray number on each platform (simulated)', () => {

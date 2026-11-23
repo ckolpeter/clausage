@@ -80,6 +80,28 @@ test('history: flush() writes a pending sample immediately (quit)', () => {
   fs.unlinkSync(file);
 });
 
+test('config: values from a bad config.json fall back to valid ones', () => {
+  const { sanitize, applyPatch } = require('../src/config');
+  const D = { source: 'web', language: 'auto', intervalSec: 120, opacity: 0.95, notify: true, notifyThresholds: [80, 95],
+    quietStart: '23:00', quietEnd: '08:00', theme: 'dark', scale: 1, hotkey: 'CommandOrControl+Alt+C', trayMetric: 'five_hour',
+    bounds: null, orgId: null, accounts: [], mainEmail: '' };
+  const c = sanitize({ ...D, source: 'x', intervalSec: 5, opacity: 'lots', notify: 'yes', notifyThresholds: [200, '50', 50, 'x', 79.6],
+    quietStart: '25:00', theme: 123, scale: 9, hotkey: 42, trayMetric: 'week', bounds: { x: 1, y: 2, width: 'w', height: 3 },
+    orgId: '../../etc', accounts: [{ partition: 'persist:claude-acct-k1', email: 'a@b' }, { partition: 'persist:claude' }, null],
+    language: '<script>', mainEmail: 7, junk: true }, D);
+  assert.deepEqual(c, { ...D, intervalSec: 30, scale: 1.5, notifyThresholds: [50, 80],
+    accounts: [{ partition: 'persist:claude-acct-k1', email: 'a@b' }] });
+  assert.equal('junk' in c, false);
+  // Settings window: user settings only; internal fields are ignored
+  const after = applyPatch(c, { theme: 'light', intervalSec: '300', accounts: [], bounds: { x: 0, y: 0, width: 9, height: 9 }, mainEmail: 'x' }, D);
+  assert.equal(after.theme, 'light');
+  assert.equal(after.intervalSec, 300);
+  assert.equal(after.accounts.length, 1);
+  assert.equal(after.bounds, null);
+  assert.equal(after.mainEmail, '');
+  assert.deepEqual(applyPatch(c, null, D), c);
+});
+
 test('version comparison', () => {
   const { newer } = require('../src/version');
   assert.equal(newer('v0.2.0', '0.1.0'), true);
