@@ -76,6 +76,14 @@ test('threshold notification fires once per window even though resets_at jitters
   assert.match(r.state.windows[0].resetsAt, /:00.000Z$/); // rounded to the minute
 });
 
+test('regular poll fetches while in use, pauses while the computer is locked', () => {
+  const active = run({ CLAUSAGE_POLL_MS: '60', WAIT_MS: '700' });
+  assert.ok(active.usageFetches >= 3, `active: ${active.usageFetches} fetches`);
+  const locked = run({ CLAUSAGE_POLL_MS: '60', WAIT_MS: '700', IDLE_STATE: 'locked' });
+  assert.equal(locked.usageFetches, 1); // only the startup refresh
+  assert.equal(locked.state.status, 'ok');
+});
+
 test('a failed refresh keeps the last number in the tray instead of the plain icon', () => {
   const win = run({ FAIL_AFTER: '1', REFRESHES: '1', SIM_PLATFORM: 'win32' });
   assert.equal(win.state.status, 'error');

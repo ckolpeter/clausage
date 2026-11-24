@@ -23,6 +23,7 @@ const { CodeStats } = require('./code-stats');
 const { FullscreenWatcher } = require('./fullscreen');
 const { writeFileAtomic, Debounced } = require('./store');
 const { withTimeout } = require('./timeout');
+const { pollDue, AWAY_AFTER_SEC } = require('./poll');
 const { sanitize, applyPatch, cleanThresholds } = require('./config');
 const usage = require('./usage');
 const { planOf, hasUsage } = usage;
@@ -136,6 +137,7 @@ let retryTimer = null;
 let failCount = 0;      // consecutive non-auth failures, for retry backoff
 let lastFormatWarn = '';  // last logged format-issue set, so each change is logged once
 let refreshing = null;  // in-flight refresh, so overlapping triggers share one request
+let lastRefreshAt = 0;  // start of the last refresh from any trigger
 // Per-request limit, so a hung request can't stall refreshing forever (env override for tests)
 const REQUEST_TIMEOUT_MS = Number(process.env.CLAUSAGE_TIMEOUT_MS) || 20e3;
 let history = null;
@@ -414,6 +416,7 @@ function refresh() {
 
 async function doRefresh() {
   clearTimeout(retryTimer);
+  lastRefreshAt = Date.now();
   if (!net.isOnline()) {
     failCount++;
     const prev = lastState.status === 'ok' ? lastState : lastState.prev;
@@ -480,8 +483,16 @@ async function doRefresh() {
 
 function schedule() {
   clearInterval(pollTimer);
-  const sec = Math.max(30, Number(config.intervalSec) || 120);
-  pollTimer = setInterval(refresh, sec * 1000);
+  // Test hook: a short interval so the smoke runner can see the poll at work
+  const ms = Number(process.env.CLAUSAGE_POLL_MS) || Math.max(30, Number(config.intervalSec) || 120) * 1000;
+  pollTimer = setInterval(() => pollTick(ms), ms);
+}
+
+/** Regular poll: skipped if something else just refreshed, slowed down while idle or locked */
+function pollTick(intervalMs) {
+  let idleState = 'unknown';
+  try { idleState = powerMonitor.getSystemIdleState(AWAY_AFTER_SEC); } catch { /* unsupported here */ }
+  if (pollDue({ now: Date.now(), lastAt: lastRefreshAt, intervalMs, idleState })) refresh();
 }
 
 function resolvedTheme() {
@@ -1065,6 +1076,8 @@ app.whenReady().then(async () => {
 
   createWidget();
   powerMonitor.on('resume', () => setTimeout(refresh, 5000));
+  // Back at the computer (Windows/macOS): show fresh numbers right away instead of at the next tick
+  powerMonitor.on('unlock-screen', () => { if (Date.now() - lastRefreshAt > 60e3) refresh(); });
   schedule();
   updater.start(config.autoUpdate);
   registerHotkeys();

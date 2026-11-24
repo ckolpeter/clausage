@@ -102,6 +102,21 @@ test('config: values from a bad config.json fall back to valid ones', () => {
   assert.deepEqual(applyPatch(c, null, D), c);
 });
 
+test('poll: skips right after another refresh, slows down while idle or locked', () => {
+  const { pollDue, AWAY_MS } = require('../src/poll');
+  const I = 120e3, now = 10 * 3600e3;
+  assert.equal(pollDue({ now, lastAt: 0, intervalMs: I, idleState: 'locked' }), true);        // never refreshed
+  assert.equal(pollDue({ now, lastAt: now - I, intervalMs: I, idleState: 'active' }), true);   // normal tick
+  assert.equal(pollDue({ now, lastAt: now - 20e3, intervalMs: I, idleState: 'active' }), false); // manual refresh just now
+  assert.equal(pollDue({ now, lastAt: now - I, intervalMs: I, idleState: 'unknown' }), true);  // can't tell → as before
+  for (const st of ['idle', 'locked']) {
+    assert.equal(pollDue({ now, lastAt: now - 4 * I, intervalMs: I, idleState: st }), false);
+    assert.equal(pollDue({ now, lastAt: now - AWAY_MS, intervalMs: I, idleState: st }), true); // every 10 min
+  }
+  // A long interval of the user's own isn't stretched further
+  assert.equal(pollDue({ now, lastAt: now - 3600e3, intervalMs: 3600e3, idleState: 'idle' }), true);
+});
+
 test('version comparison', () => {
   const { newer } = require('../src/version');
   assert.equal(newer('v0.2.0', '0.1.0'), true);

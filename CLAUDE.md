@@ -34,7 +34,7 @@ Personal environment notes and current status are in `CLAUDE.local.md` (gitignor
 
 - Privacy: requests go only to claude.ai / api.anthropic.com / GitHub (updates). No telemetry. Never log tokens/cookies.
 - Keep `contextIsolation: true`, `sandbox: true`; renderers use `textContent`/`esc()` for any data; `innerHTML` only for our own locale strings.
-- Polling default 120 s, min 30 s. Failures retry with backoff 15/30/60 s; offline uses `net.isOnline()`.
+- Polling default 120 s, min 30 s; while idle 15+ min or locked, at most every 10 min (`src/poll.js`), refresh on unlock. Failures retry with backoff 15/30/60 s; offline uses `net.isOnline()`.
 - Every user-facing string goes through i18n. **Add new keys to all 10 locale files** with identical `{placeholders}` and `<b>` tags — `test/misc.test.js` enforces this. Errors carry i18n keys (`AppError(key, vars)`), not text.
 - All notifications go through `notify()` so quiet hours apply.
 - Platform differences are expected: macOS shows the tray number as menu-bar text (`tray.setTitle`), Windows/Linux draw it into the icon. Tests must not assume one behaviour — use `SIM_PLATFORM=darwin|win32` in the smoke runner.

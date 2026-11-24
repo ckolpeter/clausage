@@ -98,7 +98,7 @@ Actions 會建立 Release 草稿並附上 `.exe` / `.dmg` / `.AppImage` / `.deb`
 
 ## 風險與注意事項
 
-1. **非公開介面**：Anthropic 隨時可能改掉 `/api/organizations/{org}/usage`。保持更新頻率保守（預設 120 秒），README 也要寫清楚。
+1. **非公開介面**：Anthropic 隨時可能改掉 `/api/organizations/{org}/usage`。保持更新頻率保守（預設 120 秒，電腦閒置或鎖定時最多每 10 分鐘一次），README 也要寫清楚。
 2. **使用條款**：自動化存取 claude.ai 可能受服務條款限制。這是讀取自己帳號的資料、頻率很低，但要在 README 提醒使用者自行評估。
 3. **商標**：名稱與圖示不使用 Anthropic 的 logo；README 已寫明「非官方」。
 4. **憑證安全**：sessionKey 等同密碼。永遠不能寫進 log、不能送到第三方；issue 範本已提醒使用者不要貼。

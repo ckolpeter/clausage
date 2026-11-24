@@ -25,13 +25,14 @@ setTimeout(async () => {
   const ipc = global.__ipc;
   for (let i = 0; i < Number(process.env.REFRESHES || 0); i++) await ipc.refresh();
   const state = global.__sent.filter(s => s[0] === 'usage').pop()?.[1];
+  const usageFetches = global.__usageFetches || 0;
   const settings = await ipc['settings:get']();
   await ipc['settings:set']({}, { notifyThresholds: [95, 50, 200, 'x'], accounts: [{ partition: 'persist:claude-acct-evil' }] });
   await ipc['settings:set']({}, null);
   const after = await ipc['settings:get']();
   process.stdout.write('\n@@RESULT@@' + JSON.stringify({
     state, tooltip: global.__tooltip, trayImage: !!global.__trayImage, trayImageKind: global.__trayImage, trayTitle: global.__trayTitle || '', platform: process.platform,
-    languages: settings.languages.length, notes: (global.__notes || []).map(n => n.title), thresholds: after.config.notifyThresholds, accountsAfter: after.config.accounts.length, config: after.config,
+    languages: settings.languages.length, notes: (global.__notes || []).map(n => n.title), thresholds: after.config.notifyThresholds, accountsAfter: after.config.accounts.length, config: after.config, usageFetches,
   }));
   process.exit(0);
 }, Number(process.env.WAIT_MS || 800));

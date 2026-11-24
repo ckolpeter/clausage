@@ -1,5 +1,5 @@
 // Minimal Electron stand-in so test/smoke.test.js can run src/main.js under plain Node.
-// Env: FIXTURE (usage JSON), OFFLINE, NETFAIL, HANG (requests never answer), FAIL_AFTER (usage requests after the first N fail), JITTER (resets_at moves ±0.6 s per request like the real API), PRECONFIG (config.json contents), VERBOSE.
+// Env: FIXTURE (usage JSON), OFFLINE, NETFAIL, HANG (requests never answer), FAIL_AFTER (usage requests after the first N fail), JITTER (resets_at moves ±0.6 s per request like the real API), PRECONFIG (config.json contents), IDLE_STATE (powerMonitor idle state), VERBOSE.
 const os = require('os'), path = require('path'), fs = require('fs');
 const fixture = JSON.parse(fs.readFileSync(process.env.FIXTURE, 'utf8'));
 const log = (...a) => { if (process.env.VERBOSE) console.log('[fake]', ...a); };
@@ -45,7 +45,7 @@ const responses = {
 const session = { fromPartition: (p) => ({
   cookies: { get: async ({ name }) => (cookieJar[name] ? [{ value: cookieJar[name] }] : []), set: async () => {} },
   fetch: async (url) => { if (process.env.NETFAIL) throw new TypeError('fetch failed'); if (process.env.HANG) return new Promise(() => {});
-    if (process.env.FAIL_AFTER && url.endsWith('/usage') && ++usageCalls > Number(process.env.FAIL_AFTER)) throw new TypeError('fetch failed'); const u = new URL(url); let body = responses[u.pathname];
+    if (process.env.FAIL_AFTER && url.endsWith('/usage') && ++usageCalls > Number(process.env.FAIL_AFTER)) throw new TypeError('fetch failed'); const u = new URL(url); let body = responses[u.pathname]; if (u.pathname.endsWith('/usage')) global.__usageFetches = (global.__usageFetches || 0) + 1;
     if (process.env.JITTER && body === fixture) body = JSON.parse(JSON.stringify(body, (k, v) => (k === 'resets_at' && v ? new Date(Date.parse(v) + Math.round((Math.random() - 0.5) * 1200)).toISOString() : v))); log('fetch', u.pathname);
     return { status: body ? 200 : 404, ok: !!body, text: async () => JSON.stringify(body ?? {}) }; },
   setUserAgent() {}, clearStorageData: async () => {},
@@ -59,7 +59,7 @@ module.exports = {
   ipcMain: { handle: (c, f) => (handlers[c] = f), on: (c, f) => (handlers[c] = f) },
   nativeImage: { createFromPath: () => img('file'), createFromDataURL: () => img('drawn') },
   screen: { getPrimaryDisplay: () => display, getAllDisplays: () => [display], getDisplayMatching: () => display },
-  powerMonitor: { on() {} }, shell: { openExternal() {}, showItemInFolder() {} },
+  powerMonitor: { on() {}, getSystemIdleState: () => process.env.IDLE_STATE || 'active' }, shell: { openExternal() {}, showItemInFolder() {} },
   globalShortcut: { register: () => true, unregisterAll() {} },
   nativeTheme: { on() {}, shouldUseDarkColors: true },
   net: { isOnline: () => !process.env.OFFLINE }, dialog: { showSaveDialog: async () => ({ canceled: true }) },
