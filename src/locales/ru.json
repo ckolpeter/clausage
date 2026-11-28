@@ -115,6 +115,8 @@
   "menu.resetPos": "Сбросить положение",
   "menu.quit": "Выход",
   "win.login": "Вход в claude.ai",
+  "login.googleTitle": "Вход через Google не работает внутри приложений",
+  "login.googleBody": "Google блокирует вход во встроенных браузерах, таких как это окно. Вместо этого введите тот же адрес Gmail в поле email и выберите «Continue with email». claude.ai пришлёт код или ссылку на почту, и вы войдёте в тот же аккаунт.\n\nЕсли вы пользуетесь Claude Code, можно также выбрать в Настройки → Источник данных учётные данные Claude Code.",
   "win.settings": "Настройки Clausage",
   "w.refresh": "Обновить сейчас",
   "w.settings": "Настройки",

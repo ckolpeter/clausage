@@ -22,10 +22,10 @@ class WebContents {
   send(ch, ...a) { sent.push([ch, ...a]); }
   on(e, f) { this.handlers[e] = f; if (e === 'did-finish-load') setTimeout(f, 5); }
   async executeJavaScript(js) { if (js.includes('toDataURL')) return 'data:image/png;base64,AAAA'; return { status: 200, body: '{}' }; }
-  setZoomFactor() {} isLoading() { return false; } setWindowOpenHandler() {} getURL() { return 'https://claude.ai/new'; } reload() {}
+  setZoomFactor() {} isLoading() { return false; } setWindowOpenHandler(f) { this.openHandler = f; } getURL() { return 'https://claude.ai/new'; } reload() {}
 }
 class BrowserWindow {
-  constructor(o) { this.o = o; this.webContents = new WebContents(); this.visible = false; this.bounds = { x: 0, y: 0, width: o.width || 280, height: o.height || 160 }; this.ev = {}; }
+  constructor(o) { this.o = o; (global.__windows ||= []).push(this); this.webContents = new WebContents(); this.visible = false; this.bounds = { x: 0, y: 0, width: o.width || 280, height: o.height || 160 }; this.ev = {}; }
   loadFile() { setTimeout(() => this.ev['ready-to-show']?.(), 5); return Promise.resolve(); }
   loadURL() { return Promise.resolve(); }
   once(e, f) { this.ev[e] = f; } on(e, f) { this.ev[e] = f; }
@@ -62,5 +62,5 @@ module.exports = {
   powerMonitor: { on() {}, getSystemIdleState: () => process.env.IDLE_STATE || 'active' }, shell: { openExternal() {}, showItemInFolder() {} },
   globalShortcut: { register: () => true, unregisterAll() {} },
   nativeTheme: { on() {}, shouldUseDarkColors: true },
-  net: { isOnline: () => !process.env.OFFLINE }, dialog: { showSaveDialog: async () => ({ canceled: true }) },
+  net: { isOnline: () => !process.env.OFFLINE }, dialog: { showSaveDialog: async () => ({ canceled: true }), showMessageBox: async (_w, o) => { (global.__dialogs ||= []).push(o); return { response: 0 }; } },
 };

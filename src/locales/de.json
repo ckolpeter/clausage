@@ -115,6 +115,8 @@
   "menu.resetPos": "Position zurücksetzen",
   "menu.quit": "Beenden",
   "win.login": "Bei claude.ai anmelden",
+  "login.googleTitle": "Google-Anmeldung funktioniert nicht in Apps",
+  "login.googleBody": "Google blockiert die Anmeldung in eingebetteten Browsern wie diesem Fenster. Gib stattdessen dieselbe Gmail-Adresse in das E-Mail-Feld ein und wähle „Continue with email“. claude.ai schickt dir einen Code oder Link per E-Mail, und du bist im selben Konto angemeldet.\n\nWenn du Claude Code nutzt, kannst du auch Einstellungen → Datenquelle auf Claude-Code-Anmeldedaten stellen.",
   "win.settings": "Clausage-Einstellungen",
   "w.refresh": "Jetzt aktualisieren",
   "w.settings": "Einstellungen",

@@ -115,6 +115,8 @@
   "menu.resetPos": "重設位置",
   "menu.quit": "結束",
   "win.login": "登入 claude.ai",
+  "login.googleTitle": "Google 登入無法在 App 內使用",
+  "login.googleBody": "Google 不允許在這類內嵌瀏覽器視窗中登入。請改在 email 欄位輸入同一個 Gmail 地址，選擇「Continue with email」。claude.ai 會寄驗證碼或登入連結到你的信箱，登入後就是同一個帳號。\n\n如果你有用 Claude Code，也可以在「設定 → 資料來源」改用 Claude Code 登入憑證。",
   "win.settings": "Clausage 設定",
   "w.refresh": "立即更新",
   "w.settings": "設定",

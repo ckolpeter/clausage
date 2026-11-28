@@ -115,6 +115,8 @@
   "menu.resetPos": "Réinitialiser la position",
   "menu.quit": "Quitter",
   "win.login": "Se connecter à claude.ai",
+  "login.googleTitle": "La connexion Google ne fonctionne pas dans les applications",
+  "login.googleBody": "Google bloque la connexion depuis les navigateurs intégrés comme cette fenêtre. Saisissez plutôt la même adresse Gmail dans le champ e-mail et choisissez « Continue with email ». claude.ai vous enverra un code ou un lien par e-mail et vous serez connecté au même compte.\n\nSi vous utilisez Claude Code, vous pouvez aussi régler Réglages → Source des données sur les identifiants Claude Code.",
   "win.settings": "Réglages de Clausage",
   "w.refresh": "Actualiser",
   "w.settings": "Réglages",

@@ -24,6 +24,7 @@ const { FullscreenWatcher } = require('./fullscreen');
 const { writeFileAtomic, Debounced } = require('./store');
 const { withTimeout } = require('./timeout');
 const { pollDue, AWAY_AFTER_SEC } = require('./poll');
+const { isGoogleSignIn } = require('./login');
 const { sanitize, applyPatch, cleanThresholds } = require('./config');
 const usage = require('./usage');
 const { planOf, hasUsage } = usage;
@@ -711,11 +712,13 @@ function openLogin(part = PARTITION) {
     webPreferences: { partition: part, contextIsolation: true, sandbox: true },
   });
   loginWins.set(part, win);
-  // Google and other SSO providers open popups; keep them in the same session
-  win.webContents.setWindowOpenHandler(() => ({
-    action: 'allow',
-    overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: { partition: part } },
-  }));
+  guardGoogle(win.webContents, win);
+  // SSO providers open popups; keep them in the same session
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isGoogleSignIn(url)) { explainGoogle(win); return { action: 'deny' }; }
+    return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: { partition: part } } };
+  });
+  win.webContents.on('did-create-window', (child) => guardGoogle(child.webContents, win, child));
   win.loadURL(CLAUDE + '/login');
   // Already signed in → keep the window open (lets the user switch accounts);
   // auto-close only once a new sign-in happens.
@@ -736,6 +739,34 @@ function openLogin(part = PARTITION) {
     }
   }, 1500);
   win.on('closed', () => { clearInterval(check); loginWins.delete(part); });
+}
+
+/**
+ * Google blocks sign-in inside apps (its page says JavaScript is disabled). Stop before that page
+ * and explain the email sign-in, which reaches the same claude.ai account.
+ */
+function guardGoogle(wc, loginWin, popup = null) {
+  const stop = (e, legacyUrl) => {
+    const url = e?.url || legacyUrl;
+    if (e?.isMainFrame === false || !isGoogleSignIn(url)) return;
+    e.preventDefault();
+    if (popup && !popup.isDestroyed()) popup.close();
+    explainGoogle(loginWin);
+  };
+  wc.on('will-navigate', stop);
+  wc.on('will-redirect', stop);
+}
+
+let googleNoticeOpen = false;
+async function explainGoogle(loginWin) {
+  if (googleNoticeOpen) return; // navigate + redirect can both fire for one click
+  googleNoticeOpen = true;
+  try {
+    await dialog.showMessageBox(loginWin && !loginWin.isDestroyed() ? loginWin : undefined, {
+      type: 'info', title: t('win.login'), message: t('login.googleTitle'), detail: t('login.googleBody'),
+    });
+  } finally { googleNoticeOpen = false; }
+  if (loginWin && !loginWin.isDestroyed() && !loginWin.webContents.getURL().includes('/login')) loginWin.loadURL(CLAUDE + '/login');
 }
 
 async function logout(part = PARTITION) {

@@ -115,6 +115,8 @@
   "menu.resetPos": "Redefinir posição",
   "menu.quit": "Sair",
   "win.login": "Entrar no claude.ai",
+  "login.googleTitle": "O login com Google não funciona dentro de apps",
+  "login.googleBody": "O Google bloqueia o login em navegadores incorporados como esta janela. Digite o mesmo endereço do Gmail no campo de e-mail e escolha “Continue with email”. O claude.ai enviará um código ou link por e-mail e você entrará na mesma conta.\n\nSe você usa o Claude Code, também pode mudar Configurações → Fonte de dados para as credenciais do Claude Code.",
   "win.settings": "Configurações do Clausage",
   "w.refresh": "Atualizar agora",
   "w.settings": "Configurações",

@@ -115,6 +115,8 @@
   "menu.resetPos": "Restablecer posición",
   "menu.quit": "Salir",
   "win.login": "Iniciar sesión en claude.ai",
+  "login.googleTitle": "El inicio de sesión con Google no funciona dentro de apps",
+  "login.googleBody": "Google bloquea el inicio de sesión desde navegadores integrados como esta ventana. Escribe la misma dirección de Gmail en el campo de correo y elige “Continue with email”. claude.ai te enviará un código o enlace por correo y entrarás en la misma cuenta.\n\nSi usas Claude Code, también puedes cambiar Ajustes → Fuente de datos a las credenciales de Claude Code.",
   "win.settings": "Ajustes de Clausage",
   "w.refresh": "Actualizar ahora",
   "w.settings": "Ajustes",

@@ -117,6 +117,16 @@ test('poll: skips right after another refresh, slows down while idle or locked',
   assert.equal(pollDue({ now, lastAt: now - 3600e3, intervalMs: 3600e3, idleState: 'idle' }), true);
 });
 
+test('login: Google sign-in pages are recognised, its in-page button script is not', () => {
+  const { isGoogleSignIn } = require('../src/login');
+  assert.equal(isGoogleSignIn('https://accounts.google.com/o/oauth2/v2/auth?client_id=1'), true);
+  assert.equal(isGoogleSignIn('https://accounts.google.com/v3/signin/identifier?flowName=x'), true);
+  assert.equal(isGoogleSignIn('https://accounts.google.com/gsi/iframe/select'), false);
+  assert.equal(isGoogleSignIn('https://claude.ai/login'), false);
+  assert.equal(isGoogleSignIn('https://accounts.google.com.evil.example/'), false);
+  assert.equal(isGoogleSignIn('not a url'), false);
+});
+
 test('version comparison', () => {
   const { newer } = require('../src/version');
   assert.equal(newer('v0.2.0', '0.1.0'), true);

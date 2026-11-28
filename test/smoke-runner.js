@@ -26,13 +26,30 @@ setTimeout(async () => {
   for (let i = 0; i < Number(process.env.REFRESHES || 0); i++) await ipc.refresh();
   const state = global.__sent.filter(s => s[0] === 'usage').pop()?.[1];
   const usageFetches = global.__usageFetches || 0;
+  // Sign-in window: Google's page is stopped (redirect and popup) and explained instead
+  let google = null;
+  if (process.env.GOOGLE) {
+    const before = global.__windows.length;
+    ipc.login();
+    const lw = global.__windows.slice(before).find(w => w.o.webPreferences?.partition === 'persist:claude');
+    let prevented = 0;
+    const ev = (url, isMainFrame = true) => ({ url, isMainFrame, preventDefault: () => prevented++ });
+    lw.webContents.handlers['will-redirect'](ev('https://accounts.google.com/o/oauth2/v2/auth?client_id=x'));
+    lw.webContents.handlers['will-navigate'](ev('https://accounts.google.com/v3/signin/identifier'));
+    lw.webContents.handlers['will-navigate'](ev('https://claude.ai/login?step=email'));
+    lw.webContents.handlers['will-navigate'](ev('https://accounts.google.com/gsi/iframe', false));
+    const popup = lw.webContents.openHandler({ url: 'https://accounts.google.com/o/oauth2/auth' }).action;
+    const other = lw.webContents.openHandler({ url: 'https://login.example.com/sso' }).action;
+    await new Promise(r => setTimeout(r, 20));
+    google = { prevented, popup, other, dialogs: (global.__dialogs || []).map(d => d.message) };
+  }
   const settings = await ipc['settings:get']();
   await ipc['settings:set']({}, { notifyThresholds: [95, 50, 200, 'x'], accounts: [{ partition: 'persist:claude-acct-evil' }] });
   await ipc['settings:set']({}, null);
   const after = await ipc['settings:get']();
   process.stdout.write('\n@@RESULT@@' + JSON.stringify({
     state, tooltip: global.__tooltip, trayImage: !!global.__trayImage, trayImageKind: global.__trayImage, trayTitle: global.__trayTitle || '', platform: process.platform,
-    languages: settings.languages.length, notes: (global.__notes || []).map(n => n.title), thresholds: after.config.notifyThresholds, accountsAfter: after.config.accounts.length, config: after.config, usageFetches,
+    languages: settings.languages.length, notes: (global.__notes || []).map(n => n.title), thresholds: after.config.notifyThresholds, accountsAfter: after.config.accounts.length, config: after.config, usageFetches, google,
   }));
   process.exit(0);
 }, Number(process.env.WAIT_MS || 800));

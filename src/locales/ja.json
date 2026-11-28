@@ -115,6 +115,8 @@
   "menu.resetPos": "位置をリセット",
   "menu.quit": "終了",
   "win.login": "claude.ai にサインイン",
+  "login.googleTitle": "Google ログインはアプリ内では使えません",
+  "login.googleBody": "Google はこのような埋め込みブラウザーでのログインをブロックしています。代わりにメール欄に同じ Gmail アドレスを入力し、「Continue with email」を選んでください。claude.ai からコードまたはリンクがメールで届き、同じアカウントにログインできます。\n\nClaude Code をお使いなら、「設定 → データソース」を Claude Code の認証情報に切り替えることもできます。",
   "win.settings": "Clausage の設定",
   "w.refresh": "今すぐ更新",
   "w.settings": "設定",

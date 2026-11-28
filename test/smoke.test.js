@@ -84,6 +84,15 @@ test('regular poll fetches while in use, pauses while the computer is locked', (
   assert.equal(locked.state.status, 'ok');
 });
 
+test('sign-in window stops at Google (embedded browsers are blocked) and explains email sign-in', () => {
+  const r = run({ GOOGLE: '1' });
+  assert.equal(r.google.prevented, 2);          // redirect + navigation to Google; claude.ai and iframes pass
+  assert.equal(r.google.popup, 'deny');
+  assert.equal(r.google.other, 'allow');        // other SSO popups still open
+  assert.ok(r.google.dialogs.length >= 1);
+  assert.match(r.google.dialogs[0], /Google/);
+});
+
 test('a failed refresh keeps the last number in the tray instead of the plain icon', () => {
   const win = run({ FAIL_AFTER: '1', REFRESHES: '1', SIM_PLATFORM: 'win32' });
   assert.equal(win.state.status, 'error');

@@ -115,6 +115,8 @@
   "menu.resetPos": "위치 초기화",
   "menu.quit": "종료",
   "win.login": "claude.ai에 로그인",
+  "login.googleTitle": "Google 로그인은 앱 안에서 사용할 수 없습니다",
+  "login.googleBody": "Google은 이런 내장 브라우저 창에서의 로그인을 차단합니다. 대신 이메일 칸에 같은 Gmail 주소를 입력하고 “Continue with email”을 선택하세요. claude.ai가 코드나 링크를 이메일로 보내 주며, 같은 계정으로 로그인됩니다.\n\nClaude Code를 사용한다면 설정 → 데이터 소스를 Claude Code 자격 증명으로 바꿀 수도 있습니다.",
   "win.settings": "Clausage 설정",
   "w.refresh": "지금 새로고침",
   "w.settings": "설정",

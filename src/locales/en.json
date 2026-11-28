@@ -115,6 +115,8 @@
   "menu.resetPos": "Reset position",
   "menu.quit": "Quit",
   "win.login": "Sign in to claude.ai",
+  "login.googleTitle": "Google sign-in doesn't work inside apps",
+  "login.googleBody": "Google blocks signing in from embedded browsers like this window. Instead, type the same Gmail address into the email field and choose “Continue with email”. claude.ai will email you a code or link, and you'll be signed in to the same account.\n\nIf you use Claude Code, you can also set Settings → Data source to Claude Code credentials.",
   "win.settings": "Clausage Settings",
   "w.refresh": "Refresh now",
   "w.settings": "Settings",
